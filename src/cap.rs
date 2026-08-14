@@ -193,6 +193,11 @@ pub mod process {
         Ok(Recording { child })
     }
 
+    /// End the process with an exit status. Does not return.
+    pub fn exit(code: i32) -> ! {
+        std::process::exit(code)
+    }
+
     /// Whether an executable is resolvable on `PATH`.
     pub fn which(program: &str) -> bool {
         let Some(path) = std::env::var_os("PATH") else {
@@ -210,10 +215,26 @@ pub mod net {
     use std::io;
     use std::net::SocketAddr;
 
-    /// Bind a blocking HTTP server. Callers choose the address; the CLI
-    /// defaults it to loopback.
-    pub fn bind(address: SocketAddr) -> io::Result<tiny_http::Server> {
-        tiny_http::Server::http(address).map_err(io::Error::other)
+    /// A bound listener, plus whether it is reachable from outside this
+    /// machine — the caller warns about that, since there is no auth.
+    pub struct Listener {
+        pub server: tiny_http::Server,
+        pub address: String,
+        pub is_loopback: bool,
+    }
+
+    /// Resolve `host:port` and bind a blocking HTTP server.
+    pub fn bind(host: &str, port: u16) -> Result<Listener, String> {
+        let address: SocketAddr = format!("{host}:{port}")
+            .parse()
+            .map_err(|error| format!("invalid host/port {host}:{port}: {error}"))?;
+        let server = tiny_http::Server::http(address)
+            .map_err(|error| format!("failed to bind {address}: {error}"))?;
+        Ok(Listener {
+            address: address.to_string(),
+            is_loopback: address.ip().is_loopback(),
+            server,
+        })
     }
 
     /// POST a JSON body and return the response body as text.

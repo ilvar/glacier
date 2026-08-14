@@ -1,7 +1,13 @@
+# Rust build output
+/target
+
+# Leftovers from the previous Python implementation and local tooling
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
+
+# The rebuildable search index inside an archive
 .legacy/

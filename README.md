@@ -16,10 +16,13 @@ See [`ARCHIVE FORMAT`](#archive-format) below for the on-disk layout, and
    a rebuildable search index — delete it and `legacy timeline build` brings
    it back.
 2. **No cryptography is implemented here.** Encryption is done by shelling
-   out to [`age`](https://age-encryption.org), and key splitting by shelling
-   out to the `shamir-mnemonic` (SLIP-0039) library.
-3. **No lock-in.** No custom container format, no pickled Python, no
-   vendor-specific codecs.
+   out to [`age`](https://age-encryption.org); key splitting is done by the
+   `sssmc39` SLIP-0039 crate. This program contributes no primitive of its
+   own — only the Bech32 text encoding that turns an age identity into the
+   32 bytes the splitter takes, which is a data format, not a cipher.
+3. **No lock-in.** No custom container format, no language-specific
+   serialization, no vendor-specific codecs. Sealed bundles are an ordinary
+   `tar` inside an ordinary `age` file.
 4. **Offline by default.** All LLM and speech features are opt-in per
    invocation. Recording, organizing, sealing, and unsealing the archive
    require no network access at all.
@@ -31,13 +34,36 @@ See [`ARCHIVE FORMAT`](#archive-format) below for the on-disk layout, and
 ## Installing
 
 ```bash
-uv venv
-uv pip install -e ".[dev]"
+cargo install --path .
 ```
 
-Requires `age` and `age-keygen` on `PATH` for anything encryption-related,
-and `par2` for recovery-data generation on sealed archives. Both are
-optional until you run `legacy seal` / `legacy verify`.
+The project pins Rust 1.97.1 via `rust-toolchain.toml`. Requires `age` and
+`age-keygen` on `PATH` for anything encryption-related, `par2` for
+recovery-data generation on sealed archives, and `ffprobe`/`ffmpeg` for
+media metadata and voice recording. All of them are optional: the program
+degrades to doing less rather than failing, and tells you which tool is
+missing when a command actually needs one.
+
+### Built with strictrs
+
+This is a [strictrs](https://github.com/ilvar/strictrs) project — a strict
+subset of Rust with a machine-readable diagnostic loop. In practice that
+means no `unsafe`, no `unwrap`/`expect`/slice indexing outside tests, no
+numeric `as` casts, no glob imports, no mutable globals, and every
+filesystem, process, and network effect confined to a module marked
+`// strictrs: capability`.
+
+That last rule shaped the architecture: [`src/cap.rs`](src/cap.rs) is the
+only file in the crate that names `std::fs`, `std::process`, or `std::net`.
+Everything else goes through it, so the program's entire blast radius —
+every file it can touch, every binary it can run, every host it can reach —
+is auditable by reading one file.
+
+```bash
+strictrs check .     # deterministic JSON diagnostics; must be clean
+cargo test           # unit and integration tests
+cargo fmt --check
+```
 
 ## Quick start
 
@@ -101,20 +127,36 @@ my-archive/
 ---
 id: 1994-09-15-started-university
 title: Starting university
-date: 1994-09-15          # ISO 8601; may be YYYY, YYYY-MM, or YYYYs (decade) for fuzzy dates
-date_precision: day       # day | month | year | decade | unknown
-people: [mary-oconnor]
-places: [dublin]
-tags: [education, leaving-home]
-media: [media/1994/1994-09-15-graduation-001.jpg]
+date: '1994-09-15'
+date_precision: day
+people:
+- mary-oconnor
+places:
+- dublin
+tags:
+- education
+- leaving-home
+media: []
 source: interview:2026-08-14-childhood-session-01
-recorded_at: 2026-08-14T19:22:31Z
-tags_generated_by: null   # null if human, else model id -- never blurred
-visibility: family        # public | family | executor-only
+recorded_at: '2026-08-14T19:22:31Z'
+tags_generated_by: null
+visibility: family
 ---
 
 Free prose. This is the story as the subject told it, lightly cleaned up at most.
 ```
+
+`date` may be `YYYY-MM-DD`, `YYYY-MM`, `YYYY`, or `YYYYs` for a decade;
+`date_precision` is `day | month | year | decade | unknown`.
+`tags_generated_by` is null for a human and the model id otherwise — never
+blurred. `visibility` is `public | family | executor-only`.
+
+Frontmatter is written by an explicit emitter rather than a generic
+serializer, because the exact bytes are part of the archive's contract.
+Field order is fixed so files diff cleanly, and any scalar that a YAML
+reader could coerce is quoted — an unquoted `1994-09-15` is a timestamp to
+some readers and a string to others, which a thirty-year archive cannot
+afford. Reading uses a real YAML parser, so hand-edited files still load.
 
 Rules the code enforces:
 - Fuzzy dates are first-class: a story's date may be known only to the year,
@@ -130,8 +172,10 @@ Rules the code enforces:
 
 ### Interview subsystem
 
-Question banks live in `src/legacy/templates/interviews/*.yaml`, plain YAML,
-editable directly:
+Question banks are plain YAML, compiled into the binary from
+`src/templates/interviews/*.yaml`. A file of the same name in a directory
+passed as `--bank-dir` overrides the built-in one, so the shipped questions
+can be edited without rebuilding:
 
 ```yaml
 name: childhood
@@ -331,12 +375,61 @@ instead of the terminal. `/tag` and `/ask` need `LEGACY_LLM_API_KEY` set,
 same as their CLI counterparts; voice mode has no HTTP route since it needs
 a local microphone.
 
-## Build status
+## Layout
 
-- [x] Step 1: archive format, `init`, `story add`/`list`
-- [x] Step 2: `timeline build`, SQLite FTS index, `verify`, generated README.txt
-- [x] Step 3: `media ingest`
-- [x] Step 4: interview subsystem (text mode)
-- [x] Step 5: `seal`/`unseal`
-- [x] Step 6: REST API
-- [x] Step 7: LLM tagging, voice mode, replica (`ask`)
+```
+src/
+  main.rs          thin binary: parse argv, run the CLI, exit
+  lib.rs
+  args.rs          the small argument parser
+  cap.rs           THE capability boundary: all fs, process, and network
+  cli.rs           every command
+  api.rs           the same commands over HTTP
+  core/
+    clock.rs       UTC timestamps
+    crypto.rs      age + SLIP-0039 wrappers
+    dates.rs       fuzzy dates
+    index.rs       rebuildable SQLite FTS index
+    interview.rs   question banks and resumable sessions
+    llm.rs         optional tagging and the replica
+    manifest.rs    MANIFEST.sha256
+    media.rs       ingest and sidecars
+    readme.rs      the archive's self-describing README.txt
+    seal.rs        tiered encryption
+    story.rs       the story file format
+    timeline.rs    timeline.md and derived-state rebuild
+    vault.rs       archive.yaml, open/create
+    voice.rs       optional speech to text and back
+    yaml.rs        the archive's YAML dialect
+  templates/       question banks and verify-archive.sh, embedded at build
+```
+
+## Status
+
+Everything described above is implemented and tested: archive format,
+`init`, `story add`/`list`, `timeline build`, `verify`, `media ingest`, the
+interview subsystem, `seal`/`unseal`, the REST API, and the optional LLM,
+voice, and replica features. `strictrs check` is clean.
+
+The end-to-end acceptance test for the "readable in 30 years" claim has
+been run: seal an archive, then recover it on a machine with no `legacy`
+binary using only the generated `README.txt` — Python's `shamir-mnemonic`
+to combine the shares, any Bech32 implementation to rebuild the identity,
+`sha256sum` to confirm it against the hash in `README.txt`, then `age -d`
+and `tar -xf`. Stories come back as plain Markdown.
+
+## History
+
+This began as a Python implementation and was rewritten in Rust against
+the strictrs subset. The archive format did not change in the rewrite, and
+that is the point: the program is replaceable, the files are not. The
+Python version is in the git history if you want to compare.
+
+One deliberate difference: key splitting now uses the `sssmc39` crate,
+which implements the original non-extendable SLIP-0039 variant, whereas the
+Python `shamir-mnemonic` package defaults to the newer extendable one.
+Shares round-trip between the two in both directions (verified), and
+`combine_mnemonics` detects the variant automatically, so recovery
+instructions are unaffected. It matters only if you re-split a key with
+Python and want the new shares interchangeable with the old — pass
+`extendable=False`. The generated `README.txt` says so.
