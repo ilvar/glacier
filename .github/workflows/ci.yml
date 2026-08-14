@@ -166,8 +166,10 @@ jobs:
           BIN="target/${{ matrix.target }}/release/${{ matrix.binary }}"
           file "$BIN"
           file "$BIN" | grep -q "ARM aarch64"
-          # Rust musl builds come out as "static-pie linked" rather than
-          # "statically linked", so accept either spelling.
+          # Both spellings are accepted on purpose: this aarch64 build
+          # reports "statically linked", but a Rust musl build can also come
+          # out as "static-pie linked" (an x86_64-musl build here does), and
+          # which one you get depends on target and toolchain defaults.
           file "$BIN" | grep -Eq "static-pie linked|statically linked"
           # A resolved dependency here would mean musl did not get linked in.
           if ldd "$BIN" 2>&1 | grep -q "=>"; then
