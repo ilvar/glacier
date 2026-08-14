@@ -1,0 +1,25 @@
+name: work
+description: Jobs, careers, and what work meant to you
+questions:
+  - id: first-job
+    prompt: What was your first job?
+    followups:
+      - What did it pay?
+      - What did you learn from it?
+    tags: [work, first-job]
+  - id: career-path
+    prompt: How did you end up doing the work you did?
+    followups:
+      - Was it planned, or did it happen by chance?
+    tags: [work, career]
+  - id: proudest-work
+    prompt: What work are you proudest of?
+    tags: [work, pride]
+  - id: hardest-work-period
+    prompt: Was there a period of work that was especially hard?
+    followups:
+      - What got you through it?
+    tags: [work, hardship]
+  - id: work-mentors
+    prompt: Did anyone at work mentor or shape you?
+    tags: [work, mentorship]

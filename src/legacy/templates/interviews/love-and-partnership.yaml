@@ -1,0 +1,24 @@
+name: love-and-partnership
+description: Romance, partnership, and the people you loved
+questions:
+  - id: first-love
+    prompt: Tell me about the first time you fell in love.
+    followups:
+      - What was it about them?
+    tags: [love, first-love]
+  - id: meeting-partner
+    prompt: How did you meet the person or people you built a life with?
+    followups:
+      - What did you notice first?
+    tags: [love, partnership]
+  - id: what-love-taught-you
+    prompt: What has loving someone taught you about yourself?
+    tags: [love, reflection]
+  - id: hard-times-together
+    prompt: Tell me about a hard time you got through together with a partner.
+    tags: [love, hardship]
+  - id: heartbreak
+    prompt: Was there a heartbreak that shaped you?
+    followups:
+      - What did you take from it?
+    tags: [love, heartbreak]

@@ -1,0 +1,18 @@
+name: advice-and-messages
+description: What you want the people who come after you to know
+questions:
+  - id: advice-to-young-you
+    prompt: What would you tell yourself at twenty years old?
+    tags: [advice, reflection]
+  - id: advice-to-descendants
+    prompt: What do you want your children, or their children, to know?
+    tags: [advice, legacy]
+  - id: mistake-worth-sharing
+    prompt: Is there a mistake you made that is worth someone else hearing about?
+    tags: [advice, mistake]
+  - id: what-you-hope-is-remembered
+    prompt: What do you hope people remember about you?
+    tags: [advice, legacy]
+  - id: unfinished-business
+    prompt: Is there anything you still want to say, to anyone, that you haven't?
+    tags: [advice, unfinished]

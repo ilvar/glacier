@@ -6,6 +6,7 @@ from pathlib import Path
 
 import typer
 
+from legacy.core import interview as interview_mod
 from legacy.core import manifest as manifest_mod
 from legacy.core import media as media_mod
 from legacy.core import story as story_mod
@@ -16,9 +17,11 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 story_app = typer.Typer(no_args_is_help=True, help="Manage story files.")
 timeline_app = typer.Typer(no_args_is_help=True, help="Chronological index and search.")
 media_app = typer.Typer(no_args_is_help=True, help="Ingest and manage media files.")
+interview_app = typer.Typer(no_args_is_help=True, help="Guided interview sessions.")
 app.add_typer(story_app, name="story")
 app.add_typer(timeline_app, name="timeline")
 app.add_typer(media_app, name="media")
+app.add_typer(interview_app, name="interview")
 
 
 def _err(msg: str) -> None:
@@ -111,6 +114,86 @@ def story_list(
             continue
         date_label = story.date or "undated"
         typer.echo(f"{story.id}\t{date_label}\t{story.visibility}\t{story.title}")
+
+
+def _run_interview_loop(vault: Vault, session, bank) -> None:
+    typer.echo(f"Session {session.session_id!r} ({bank.description})")
+    typer.echo("Answer each question, then finish with a line containing just 'END'.")
+    typer.echo("Type 'SKIP' alone to skip a question, or 'QUIT' to stop for now.\n")
+
+    while True:
+        question = interview_mod.next_question(bank, session)
+        if question is None:
+            interview_mod.mark_complete(vault.root, session)
+            typer.secho("All questions answered. Session complete.", fg=typer.colors.GREEN)
+            return
+
+        typer.echo(f"— {question.prompt}")
+        for followup in question.followups:
+            typer.echo(f"    ({followup})")
+
+        lines: list[str] = []
+        while True:
+            try:
+                line = input("> ")
+            except EOFError:
+                line = "QUIT"
+            stripped = line.strip()
+            if not lines and stripped.upper() == "SKIP":
+                interview_mod.skip_question(vault.root, session, question)
+                typer.echo("(skipped)\n")
+                break
+            if not lines and stripped.upper() == "QUIT":
+                typer.echo(
+                    f"\nStopped. Resume later with: legacy interview resume {session.session_id}"
+                )
+                return
+            if stripped.upper() == "END":
+                answer = "\n".join(lines)
+                story = interview_mod.record_answer(vault.root, session, bank, question, answer)
+                typer.echo(f"Saved {story.relative_path()}\n")
+                break
+            lines.append(line)
+
+
+@interview_app.command("start")
+def interview_start(
+    bank_name: str = typer.Argument(..., help="Question bank name, e.g. 'childhood'."),
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+    voice: bool = typer.Option(False, "--voice", help="Record and transcribe answers with speech."),
+):
+    """Start a new interview session from a question bank."""
+    vault = Vault.open(archive)
+    if voice:
+        _err("Voice mode is not implemented yet; run without --voice.")
+        return
+    try:
+        bank = interview_mod.load_bank(bank_name)
+        session = interview_mod.new_session(vault.root, bank_name, mode="text")
+    except interview_mod.InterviewError as e:
+        _err(str(e))
+        return
+    interview_mod.save_session(vault.root, session)
+    _run_interview_loop(vault, session, bank)
+
+
+@interview_app.command("resume")
+def interview_resume(
+    session_id: str = typer.Argument(..., help="Session id, e.g. 2026-08-14-childhood-session-01."),
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+):
+    """Resume an existing interview session."""
+    vault = Vault.open(archive)
+    try:
+        session = interview_mod.load_session(vault.root, session_id)
+        bank = interview_mod.load_bank(session.bank)
+    except interview_mod.InterviewError as e:
+        _err(str(e))
+        return
+    if session.status == "complete":
+        typer.echo(f"Session {session_id!r} is already complete.")
+        return
+    _run_interview_loop(vault, session, bank)
 
 
 @media_app.command("ingest")

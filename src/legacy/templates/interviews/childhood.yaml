@@ -1,0 +1,32 @@
+name: childhood
+description: Early years, family, home
+questions:
+  - id: earliest-memory
+    prompt: What is the earliest thing you can remember?
+    followups:
+      - How old were you?
+      - Who else was there?
+    tags: [childhood, memory]
+  - id: childhood-home
+    prompt: Describe the home or homes you grew up in.
+    followups:
+      - What did your bedroom look like?
+      - What sounds or smells do you associate with it?
+    tags: [childhood, home]
+  - id: favorite-game
+    prompt: What did you like to play, alone or with others?
+    followups:
+      - Who did you play with?
+      - Did you have a favorite toy?
+    tags: [childhood, play]
+  - id: childhood-fear
+    prompt: Was there anything you were afraid of as a child?
+    followups:
+      - How did you deal with it?
+    tags: [childhood, emotion]
+  - id: family-mealtimes
+    prompt: What were mealtimes like in your family?
+    followups:
+      - Who cooked?
+      - Did you eat together?
+    tags: [childhood, family]

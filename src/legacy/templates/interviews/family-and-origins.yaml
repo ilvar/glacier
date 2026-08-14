@@ -1,0 +1,32 @@
+name: family-and-origins
+description: Parents, grandparents, and where the family comes from
+questions:
+  - id: parents-story
+    prompt: Tell me about your parents. Who were they, really?
+    followups:
+      - What did they do for work?
+      - What is something you only understood about them later in life?
+    tags: [family, parents]
+  - id: grandparents
+    prompt: What do you remember about your grandparents?
+    followups:
+      - Did you know them well?
+      - What did they pass down to you?
+    tags: [family, grandparents]
+  - id: family-origin
+    prompt: Where does your family come from, as far as you know?
+    followups:
+      - Is there a migration story in your family?
+      - How did that shape you?
+    tags: [family, origins]
+  - id: family-traditions
+    prompt: What traditions or rituals mattered in your family?
+    followups:
+      - Are they still practiced?
+    tags: [family, tradition]
+  - id: siblings
+    prompt: Tell me about your siblings, if you had any.
+    followups:
+      - What was your relationship like growing up?
+      - How has it changed?
+    tags: [family, siblings]

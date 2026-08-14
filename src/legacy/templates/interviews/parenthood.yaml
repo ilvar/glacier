@@ -1,0 +1,20 @@
+name: parenthood
+description: Becoming and being a parent, if that applies to you
+questions:
+  - id: learning-you-were-a-parent
+    prompt: What do you remember about learning you were going to be a parent?
+    tags: [parenthood, beginning]
+  - id: first-days-as-parent
+    prompt: What were the first days or weeks like?
+    followups:
+      - What surprised you most?
+    tags: [parenthood, beginning]
+  - id: parenting-philosophy
+    prompt: What did you try hardest to give your children, or do differently than your own parents?
+    tags: [parenthood, values]
+  - id: hardest-part-of-parenting
+    prompt: What was the hardest part of raising children?
+    tags: [parenthood, hardship]
+  - id: proud-parent-moment
+    prompt: Tell me about a moment you were especially proud as a parent.
+    tags: [parenthood, pride]

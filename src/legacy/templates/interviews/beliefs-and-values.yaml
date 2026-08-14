@@ -1,0 +1,22 @@
+name: beliefs-and-values
+description: What you came to believe, and why
+questions:
+  - id: core-values
+    prompt: What values matter most to you, and where do you think they came from?
+    tags: [beliefs, values]
+  - id: faith-or-spirituality
+    prompt: What role has faith or spirituality played in your life, if any?
+    followups:
+      - Has that changed over time?
+    tags: [beliefs, faith]
+  - id: changed-mind
+    prompt: Is there something you believed strongly and later changed your mind about?
+    followups:
+      - What changed it?
+    tags: [beliefs, growth]
+  - id: what-you-stand-for
+    prompt: Is there something you would stand up for, no matter the cost?
+    tags: [beliefs, conviction]
+  - id: definition-of-a-good-life
+    prompt: How would you define a good life?
+    tags: [beliefs, meaning]

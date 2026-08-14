@@ -1,0 +1,25 @@
+name: objects-and-places
+description: The physical things and places that hold your story
+questions:
+  - id: object-that-matters
+    prompt: Is there an object you own that carries a story?
+    followups:
+      - Where did it come from?
+      - Who will get it after you?
+    tags: [objects]
+  - id: place-that-matters
+    prompt: What place in the world means the most to you?
+    followups:
+      - When did you last go there?
+    tags: [places]
+  - id: a-photo-worth-explaining
+    prompt: Is there a photo of you that needs explaining for it to make sense?
+    tags: [objects, photos]
+  - id: a-recipe-or-skill
+    prompt: Is there a recipe, craft, or skill you learned that you want remembered?
+    followups:
+      - Who taught you?
+    tags: [objects, skill]
+  - id: a-place-you-lost
+    prompt: Is there a place that mattered to you that no longer exists, or that you can't go back to?
+    tags: [places, loss]

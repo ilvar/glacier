@@ -1,0 +1,26 @@
+name: school
+description: Education, teachers, and the friends you made
+questions:
+  - id: first-school
+    prompt: What do you remember about your first day of school?
+    followups:
+      - Were you excited or scared?
+    tags: [school, memory]
+  - id: memorable-teacher
+    prompt: Was there a teacher who changed how you saw things?
+    followups:
+      - What did they teach you, beyond the subject?
+    tags: [school, teacher]
+  - id: school-friends
+    prompt: Who were your closest friends in school?
+    followups:
+      - Are you still in touch with any of them?
+    tags: [school, friendship]
+  - id: school-subject
+    prompt: What subject did you love, or dread, and why?
+    tags: [school, learning]
+  - id: leaving-school
+    prompt: What was it like leaving school, or finishing your education?
+    followups:
+      - What did you think would come next?
+    tags: [school, transition]

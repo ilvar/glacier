@@ -122,6 +122,43 @@ Rules the code enforces:
 - `visibility` gates which encrypted tier (if any) a story ends up in when
   the archive is sealed, and what the replica is allowed to discuss.
 
+### Interview subsystem
+
+Question banks live in `src/legacy/templates/interviews/*.yaml`, plain YAML,
+editable directly:
+
+```yaml
+name: childhood
+description: Early years, family, home
+questions:
+  - id: earliest-memory
+    prompt: What is the earliest thing you can remember?
+    followups:
+      - How old were you?
+      - Who else was there?
+    tags: [childhood, memory]
+```
+
+Ships ten banks: `childhood`, `family-and-origins`, `school`, `work`,
+`love-and-partnership`, `parenthood`, `beliefs-and-values`, `turning-points`,
+`advice-and-messages`, `objects-and-places`.
+
+```bash
+legacy interview start childhood --archive ./my-archive
+legacy interview resume 2026-08-14-childhood-session-01 --archive ./my-archive
+```
+
+Each answer is written as a story file (`timeline/<year>/<session-id>-<question-id>.md`,
+`source: interview:<session-id>`) **immediately** after you finish typing it —
+before the session state file is updated — so a crash mid-session never loses
+an already-given answer. During a session: finish an answer with a line
+containing just `END`, type `SKIP` alone to move on without answering, or
+`QUIT` to stop and resume later. The session itself is recorded at
+`interviews/<session-id>.md`: which questions are answered/skipped, which
+story each became, and a running transcript. `--voice` mode (record audio,
+transcribe with Whisper, keep both) lands in step 7 — the question bank and
+resumability work fully offline without it.
+
 ### Media sidecar format
 
 Every file under `media/` has a same-named `.yaml` sidecar recording what the
@@ -198,7 +235,7 @@ the confidentiality it buys.
 - [x] Step 1: archive format, `init`, `story add`/`list`
 - [x] Step 2: `timeline build`, SQLite FTS index, `verify`, generated README.txt
 - [x] Step 3: `media ingest`
-- [ ] Step 4: interview subsystem (text mode)
+- [x] Step 4: interview subsystem (text mode)
 - [ ] Step 5: `seal`/`unseal`
 - [ ] Step 6: REST API
 - [ ] Step 7: LLM tagging, voice mode, replica (`ask`)

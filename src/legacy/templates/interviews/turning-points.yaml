@@ -1,0 +1,25 @@
+name: turning-points
+description: The moments that changed the direction of your life
+questions:
+  - id: biggest-turning-point
+    prompt: What is the biggest turning point in your life?
+    followups:
+      - What was your life like before, and after?
+    tags: [turning-point]
+  - id: hardest-decision
+    prompt: What is the hardest decision you have ever made?
+    followups:
+      - How did you decide?
+      - Do you still think it was right?
+    tags: [turning-point, decision]
+  - id: unexpected-event
+    prompt: Did something unexpected ever completely change your plans?
+    tags: [turning-point, chance]
+  - id: risk-you-took
+    prompt: Tell me about a risk you took that mattered.
+    followups:
+      - What would have happened if you hadn't?
+    tags: [turning-point, risk]
+  - id: loss-that-changed-you
+    prompt: Was there a loss that changed who you were?
+    tags: [turning-point, loss]
