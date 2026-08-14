@@ -1,0 +1,200 @@
+LEGACY ARCHIVE — READ THIS FIRST
+=================================
+
+This directory is a "legacy" archive: a life story, in plain files, for
+{{ config.subject_name }}. It was created on {{ config.created_at }} using a
+program called "legacy" (https://github.com/ilvar/glacier), but you do not
+need that program, or any program, to read most of what is here. Everything
+in this file is plain prose. If you are a technician in the future who has
+never heard of "legacy", this file alone should be enough.
+
+Archive schema version: {{ config.schema_version }}
+
+
+1. WHAT IS SAFE TO READ RIGHT NOW, UNENCRYPTED
+------------------------------------------------
+
+Everything in this archive root is plain text or a common file format
+(Markdown, JPEG, WAV, ...) EXCEPT the contents of the `sealed/` directory,
+which are encrypted. You can read stories, look at photos, and browse
+freely without any password or key, UNLESS a story's `visibility` field
+is "family" or "executor-only" and it has already been moved into
+`sealed/` by the `legacy seal` command. Stories marked "public" are never
+encrypted and always remain in `timeline/` as plain files.
+
+
+2. DIRECTORY LAYOUT
+---------------------
+
+  archive.yaml        Machine-readable configuration: subject name, schema
+                       version, and the encryption/threshold settings for
+                       each visibility tier. Plain YAML, human-readable.
+
+  MANIFEST.sha256      One line per file in this archive: a SHA-256 hash and
+                       its path. Regenerate and check with `sha256sum -c`
+                       (see section 5). Used to detect corruption or
+                       accidental edits.
+
+  timeline/            Story files, one per Markdown (.md) file, grouped
+                       into folders by year (e.g. timeline/1994/), or under
+                       timeline/undated/ if the story has no known date.
+                       See section 3 for the file format.
+
+  people/               One Markdown file per person mentioned in the
+                       stories, e.g. people/mary-oconnor.md.
+
+  places/               One Markdown file per place, e.g. places/dublin.md.
+
+  media/                Original photos, scans, and recordings, organized
+                       by year. Each media file has a sidecar YAML file
+                       with the same name plus ".yaml" describing it, e.g.
+                       media/1994/graduation.jpg.yaml next to
+                       media/1994/graduation.jpg.
+
+  interviews/            Recorded interview sessions: a Markdown transcript
+                       and, if voice was used, the original .wav audio.
+                       Both are kept — the audio is never discarded.
+
+  sealed/               Encrypted tar archives, one per visibility tier
+                       that has been sealed (see section 4). Each is named
+                       <tier>.tar.age, alongside .par2 recovery files.
+
+
+3. STORY FILE FORMAT
+----------------------
+
+Every file under timeline/ is plain UTF-8 Markdown with a YAML "frontmatter"
+block at the top, delimited by lines containing only "---". For example:
+
+  ---
+  id: 1994-09-15-started-university
+  title: Starting university
+  date: 1994-09-15
+  date_precision: day
+  people: [mary-oconnor]
+  places: [dublin]
+  tags: [education, leaving-home]
+  media: [media/1994/1994-09-15-graduation-001.jpg]
+  source: interview:2026-08-14-childhood-session-01
+  recorded_at: 2026-08-14T19:22:31Z
+  tags_generated_by: null
+  visibility: family
+  ---
+
+  Free prose. This is the story as the subject told it, lightly cleaned up
+  at most.
+
+Any text editor can open these files. `date_precision` may be "day",
+"month", "year", "decade", or "unknown" — life stories rarely come with
+exact dates, and this archive never invents one.  `tags_generated_by` is
+null when a tag was written by a human, or the name of an AI model if a
+machine suggested it — this line is never blurred.  `visibility` is one of
+"public", "family", or "executor-only", and controls which encrypted tier
+(if any) the story belongs to once sealed.
+
+
+4. THE ENCRYPTION SCHEME
+--------------------------
+
+This archive uses two off-the-shelf, widely reviewed tools, not anything
+custom:
+
+  * age (https://age-encryption.org) for the actual file encryption.
+  * SLIP-0039 (https://github.com/satoshilabs/slips/blob/master/slip-0039.md)
+    "Shamir's Secret Sharing" for splitting the decryption key into
+    several human-readable word lists ("shares"), so that no single
+    keyholder can decrypt alone, but a subset of them together can.
+
+For each visibility tier that was sealed ("family", "executor-only"), a
+random age identity (a private key) was generated, used to encrypt that
+tier's files into `sealed/<tier>.tar.age`, and then THROWN AWAY — it exists
+nowhere except split into shares. The shares were printed to the terminal
+once, at seal time, and given to trusted keyholders. This archive does not
+store them.
+
+{% for name, tier in config.tiers.items() %}
+  Tier "{{ name }}": {{ tier.threshold }} of {{ tier.shares }} shares are
+  required to reconstruct the key.
+  {% if tier.identity_sha256 %}
+  SHA-256 of the correct reconstructed identity: {{ tier.identity_sha256 }}
+  (compare against this BEFORE concluding the archive is corrupt — if your
+  reconstructed key's hash matches this, the key is right and any decrypt
+  failure is a different problem, e.g. a damaged .tar.age file, which
+  `par2` may be able to repair; see section 5.)
+  {% else %}
+  This tier has not been sealed yet; no encrypted blob exists for it.
+  {% endif %}
+{% endfor %}
+
+TO RECONSTRUCT THE KEY AND DECRYPT (step by step, no special software
+beyond `age` and a SLIP-0039 tool):
+
+  a. Gather at least the threshold number of shares for the tier you want
+     to open. Each share is a list of English words.
+
+  b. Reconstruct the age identity from the shares. Using the Python
+     "shamir-mnemonic" package (pip install shamir-mnemonic):
+
+       python3 -c "
+       import shamir_mnemonic as sm
+       shares = [
+           'share one words here...',
+           'share two words here...',
+           'share three words here...',
+       ]
+       secret = sm.combine_mnemonics(shares)
+       print(secret.hex())
+       "
+
+     Then convert those 32 raw bytes back into an age identity string by
+     Bech32-encoding them with the human-readable prefix "age-secret-key-",
+     and upper-casing the result. If you have the `legacy` program
+     available, `legacy unseal --share "..." --share "..."` does steps
+     (b) and (c) for you. Otherwise, any Bech32 implementation will do —
+     it is a simple checksummed encoding, described at
+     https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki
+
+  c. Verify: SHA-256 the resulting identity string and compare it to the
+     "SHA-256 of the correct reconstructed identity" line above for that
+     tier. If it matches, you have the right key.
+
+  d. Decrypt with age:
+
+       age -d -i /path/to/identity.txt -o archive.tar sealed/<tier>.tar.age
+
+     (put the reconstructed "AGE-SECRET-KEY-1..." string, and nothing
+     else, in identity.txt)
+
+  e. Untar: tar -xf archive.tar
+
+  f. The extracted files are ordinary Markdown, images, and audio — open
+     them with anything.
+
+
+5. INTEGRITY: CHECKSUMS AND BIT-ROT REPAIR
+---------------------------------------------
+
+MANIFEST.sha256 lists a SHA-256 checksum for every file in this archive as
+of the last time `legacy verify` or `legacy seal` ran. To check the whole
+archive against it:
+
+  cd (this directory) && sha256sum -c MANIFEST.sha256
+
+Each sealed/<tier>.tar.age file also has recovery data alongside it,
+created with `par2` (15% redundancy), covering small amounts of bit rot or
+media damage without needing a backup copy. To check and, if needed, repair:
+
+  cd sealed && par2 verify <tier>.tar.age.par2
+  cd sealed && par2 repair <tier>.tar.age.par2     # only if verify fails
+
+
+6. IMPORTANT NOTE ON THE MOST LIKELY FAILURE MODE
+-----------------------------------------------------
+
+In practice, the greater risk to this archive is not a stranger reading it
+— it is the family being unable to decrypt it at all: shares lost,
+scattered, or a keyholder unreachable. If this archive was sealed with
+"plaintext escrow" enabled for a tier, that tier's files were left
+UNENCRYPTED in sealed/<tier>/ specifically to avoid that failure. Check
+archive.yaml's "plaintext_escrow" field for each tier before assuming
+sealed/ requires a key at all.
