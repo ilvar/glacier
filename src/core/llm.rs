@@ -47,23 +47,29 @@ pub struct LlmSettings {
 }
 
 impl LlmSettings {
+    /// Read configuration from the environment.
+    ///
+    /// The `LEGACY_`-prefixed names win, so this program can be pointed at
+    /// a different model than everything else on the machine. When they
+    /// are absent it falls back to the conventional `OPENAI_*` names, so
+    /// a shell that already has a key exported just works.
     pub fn from_env() -> LlmSettings {
         LlmSettings {
-            api_key: std::env::var("LEGACY_LLM_API_KEY").ok(),
-            base_url: std::env::var("LEGACY_LLM_BASE_URL")
-                .unwrap_or_else(|_missing| DEFAULT_BASE_URL.to_owned()),
-            model: std::env::var("LEGACY_LLM_MODEL")
-                .unwrap_or_else(|_missing| DEFAULT_MODEL.to_owned()),
+            api_key: crate::core::env::first(&["LEGACY_LLM_API_KEY", "OPENAI_API_KEY"]),
+            base_url: crate::core::env::first(&["LEGACY_LLM_BASE_URL", "OPENAI_BASE_URL"])
+                .unwrap_or_else(|| DEFAULT_BASE_URL.to_owned()),
+            model: crate::core::env::first(&["LEGACY_LLM_MODEL", "OPENAI_MODEL"])
+                .unwrap_or_else(|| DEFAULT_MODEL.to_owned()),
         }
     }
 
     fn require_key(&self) -> Result<&str, LlmError> {
         self.api_key.as_deref().ok_or_else(|| {
             LlmError(
-                "No LLM configured. Set LEGACY_LLM_API_KEY (and optionally \
-                 LEGACY_LLM_BASE_URL to point at a local or self-hosted \
-                 OpenAI-compatible model) to use this feature. Everything else in \
-                 this program works without it."
+                "No LLM configured. Set LEGACY_LLM_API_KEY or OPENAI_API_KEY (and \
+                 optionally LEGACY_LLM_BASE_URL or OPENAI_BASE_URL to point at a \
+                 local or self-hosted OpenAI-compatible model) to use this feature. \
+                 Everything else in this program works without it."
                     .to_owned(),
             )
         })

@@ -1,0 +1,230 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Deliberately no global `RUSTFLAGS: -D warnings`: that applies to
+  # dependencies too, so an upstream crate emitting a warning would fail
+  # our build. The clippy step below denies warnings for our own code,
+  # which is where the policy belongs.
+
+jobs:
+  # Formatting, lints, and the strict-subset check run once. They are
+  # platform-independent, so repeating them per OS would only cost time.
+  check:
+    name: Format, clippy, and strictrs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # strictrs publishes no lockfile, so this resolves fresh. If an
+      # upstream break ever makes that flaky, pin --rev here.
+      - name: Install strictrs
+        run: cargo install --git https://github.com/ilvar/strictrs
+
+      - name: strictrs check
+        run: strictrs check .
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      # `age` is needed by the crypto and seal tests. Those tests skip
+      # themselves when it is absent, so installing it here is what makes
+      # the encryption path actually covered rather than silently skipped.
+      - name: Install age (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y age
+
+      - name: Install age (macOS)
+        if: runner.os == 'macOS'
+        run: brew install age
+
+      - name: Install age (Windows)
+        if: runner.os == 'Windows'
+        run: choco install age.portable -y
+
+      - name: Confirm age is on PATH
+        shell: bash
+        run: age --version && age-keygen --version || true
+
+      - name: cargo test
+        run: cargo test --all-targets --all-features
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [check, test]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux ships static MUSL binaries so they run on any
+          # distribution without a glibc version to match.
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            binary: legacy
+            cross: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            binary: legacy
+            cross: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary: legacy
+            cross: false
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary: legacy
+            cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: legacy.exe
+            cross: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Add the target
+        run: rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # rusqlite bundles SQLite, so a cross-compiled build needs a C
+      # cross-compiler as well as the Rust target.
+      - name: Install cross-compilation tooling
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-musl" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      # A binary that cannot print its own help is not a working build.
+      # Skipped when cross-compiling, where the host cannot run it.
+      - name: Smoke-test the binary
+        if: matrix.target != 'aarch64-unknown-linux-musl'
+        shell: bash
+        run: |
+          ./target/${{ matrix.target }}/release/${{ matrix.binary }} --help
+          ./target/${{ matrix.target }}/release/${{ matrix.binary }} interview banks
+
+      - name: Report binary size
+        shell: bash
+        run: ls -l "target/${{ matrix.target }}/release/${{ matrix.binary }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/${{ matrix.binary }}
+          if-no-files-found: error
+
+  # An archive is only as good as its recovery path, so CI exercises the
+  # whole lifecycle end to end rather than trusting the unit tests alone.
+  round-trip:
+    name: Seal and unseal round trip
+    needs: [check, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install age and par2
+        run: sudo apt-get update && sudo apt-get install -y age par2
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Create, seal, and recover an archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          LEGACY="$PWD/target/release/legacy"
+          WORK="$(mktemp -d)"
+          cd "$WORK"
+
+          "$LEGACY" init ./arch --subject "CI Subject" --threshold 2 --shares 3
+          "$LEGACY" story add -a ./arch --title "A family story" --date 1994-09-15 \
+            --visibility family --body "The secret phrase is xyzzy."
+          "$LEGACY" story add -a ./arch --title "A public fact" --date 1990 \
+            --visibility public --body "Anyone may read this."
+          "$LEGACY" timeline build -a ./arch
+          "$LEGACY" verify -a ./arch
+
+          "$LEGACY" seal -a ./arch --tiers family | tee seal.txt
+
+          # par2 recovery data must exist, since par2 is installed here.
+          test -f arch/sealed/family.tar.age
+          ls arch/sealed/*.par2 >/dev/null
+
+          # The plaintext archive must survive sealing untouched.
+          test -f arch/timeline/1994/1994-09-15-a-family-story.md
+
+          # Public stories are never encrypted.
+          grep -q "Anyone may read this." arch/timeline/1990/1990-a-public-fact.md
+
+          # Recover with exactly the threshold number of shares.
+          S1="$(sed -n 's/.*share 1: //p' seal.txt | head -1)"
+          S2="$(sed -n 's/.*share 2: //p' seal.txt | head -1)"
+          "$LEGACY" unseal -a ./arch --share "$S1" --share "$S2"
+          grep -rq "The secret phrase is xyzzy." arch/unsealed/family/
+
+          # The bundled bash verifier must work on its own.
+          (cd arch && ./verify-archive.sh)
+
+          echo "Round trip complete."
+
+      - name: Confirm the archive is recoverable without the binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          # README.txt must carry everything a future reader needs: the
+          # standard, the encoding, and the key hash to check against.
+          WORK="$(mktemp -d)" && cd "$WORK"
+          "$GITHUB_WORKSPACE/target/release/legacy" init ./arch --subject "CI Subject"
+          grep -q "slip-0039.md" arch/README.txt
+          grep -q "bip-0173" arch/README.txt
+          grep -q "age -d -i" arch/README.txt
+          grep -q "sha256sum -c MANIFEST.sha256" arch/README.txt
+          echo "README.txt documents the full recovery path."

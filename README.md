@@ -6,8 +6,8 @@ media files, then seals the result so a threshold of trusted keyholders can
 unlock it after their death. The unlocked archive can be read as plain files,
 or loaded by an LLM to answer questions in the subject's own voice.
 
-See [`ARCHIVE FORMAT`](#archive-format) below for the on-disk layout, and
-[`docs`](#build-status) for what's implemented so far.
+See [Archive format](#archive-format) for the on-disk layout, [Status](#status)
+for what works today, and [To do](#to-do) for what does not yet.
 
 ## Non-negotiable design principles
 
@@ -298,23 +298,41 @@ that tier into `<archive>/unsealed/<tier>/`.
 All three are optional, opt-in per invocation, and require network access
 and credentials -- everything else in this program (recording, organizing,
 sealing, decrypting) works with zero network access. They live in
-`core/llm.py` and `core/voice.py`, which nothing else in the program
-imports; the replica in particular is a *reader* of the archive, not a
-component of it, and can be deleted entirely without losing anything else.
+`src/core/llm.rs` and `src/core/voice.rs`, which nothing else in the
+program imports; the replica in particular is a *reader* of the archive,
+not a component of it, and can be deleted entirely without losing anything
+else.
 
-**Tagging and the replica** (`core/llm.py`) talk to any OpenAI-compatible
-endpoint, so a local model server works too:
+**Tagging and the replica** (`src/core/llm.rs`) talk to any
+OpenAI-compatible endpoint, so a local model server works too:
 
 ```bash
-export LEGACY_LLM_API_KEY=sk-...
-export LEGACY_LLM_BASE_URL=http://localhost:8080/v1   # optional: local model
-export LEGACY_LLM_MODEL=gpt-4o-mini                     # optional, this is the default
+export OPENAI_API_KEY=sk-...          # already exported? nothing else needed
 
 legacy tag --archive ./my-archive                # preview suggested tags (default)
 legacy tag --archive ./my-archive --apply         # write them; sets tags_generated_by
 
 legacy ask "What did you do after school?" --archive ./my-archive
 ```
+
+### Configuration
+
+Every optional feature reads a `LEGACY_`-prefixed variable first and falls
+back to the conventional vendor name, so a shell that already exports
+`OPENAI_API_KEY` needs no further setup, while anyone who wants this
+program pointed at a different model can override it without disturbing
+the rest of their environment. An empty value counts as unset.
+
+| Setting | Checked in order | Default |
+|---|---|---|
+| LLM key | `LEGACY_LLM_API_KEY`, `OPENAI_API_KEY` | none (feature disabled) |
+| LLM endpoint | `LEGACY_LLM_BASE_URL`, `OPENAI_BASE_URL` | `https://api.openai.com/v1` |
+| LLM model | `LEGACY_LLM_MODEL`, `OPENAI_MODEL` | `gpt-4o-mini` |
+| Speech key | `LEGACY_OPENAI_API_KEY`, `OPENAI_API_KEY` | none (feature disabled) |
+| Speech endpoint | `LEGACY_OPENAI_BASE_URL`, `OPENAI_BASE_URL` | `https://api.openai.com/v1` |
+| Transcription model | `LEGACY_STT_MODEL` | `whisper-1` |
+| Speech model / voice | `LEGACY_TTS_MODEL`, `LEGACY_TTS_VOICE` | `tts-1`, `alloy` |
+| Microphone input | `LEGACY_FFMPEG_AUDIO_INPUT` | `alsa:default` |
 
 `ask` retrieves candidate stories with the SQLite FTS index (`timeline build`
 must have run at least once), builds a keyword-OR query from the question
@@ -327,12 +345,11 @@ a refusal cites the story ids it drew on. The replica can never surface
 `archive.yaml`'s `replica.sunset` date, if set, makes `ask` refuse to run
 at all once passed.
 
-**Voice mode** (`core/voice.py`) is OpenAI-specific (Whisper for
-speech-to-text, TTS for playback), since the spec calls for those two APIs
-by name rather than a swappable endpoint:
+**Voice mode** (`src/core/voice.rs`) uses Whisper for speech-to-text and
+TTS for playback:
 
 ```bash
-export LEGACY_OPENAI_API_KEY=sk-...        # or OPENAI_API_KEY
+export OPENAI_API_KEY=sk-...
 legacy interview start childhood --archive ./my-archive --voice
 ```
 
@@ -409,27 +426,64 @@ src/
 Everything described above is implemented and tested: archive format,
 `init`, `story add`/`list`, `timeline build`, `verify`, `media ingest`, the
 interview subsystem, `seal`/`unseal`, the REST API, and the optional LLM,
-voice, and replica features. `strictrs check` is clean.
+voice, and replica features. `strictrs check` is clean and CI builds
+binaries for Linux, macOS, and Windows.
 
 The end-to-end acceptance test for the "readable in 30 years" claim has
 been run: seal an archive, then recover it on a machine with no `legacy`
-binary using only the generated `README.txt` — Python's `shamir-mnemonic`
+binary using only the generated `README.txt` — a SLIP-0039 implementation
 to combine the shares, any Bech32 implementation to rebuild the identity,
 `sha256sum` to confirm it against the hash in `README.txt`, then `age -d`
 and `tar -xf`. Stories come back as plain Markdown.
 
-## History
+## To do
 
-This began as a Python implementation and was rewritten in Rust against
-the strictrs subset. The archive format did not change in the rewrite, and
-that is the point: the program is replaceable, the files are not. The
-Python version is in the git history if you want to compare.
+Roughly in the order they would pay off. Nothing here is required for the
+archive to be complete and recoverable today; that already works.
 
-One deliberate difference: key splitting now uses the `sssmc39` crate,
-which implements the original non-extendable SLIP-0039 variant, whereas the
-Python `shamir-mnemonic` package defaults to the newer extendable one.
-Shares round-trip between the two in both directions (verified), and
-`combine_mnemonics` detects the variant automatically, so recovery
-instructions are unaffected. It matters only if you re-split a key with
-Python and want the new shares interchangeable with the old — pass
-`extendable=False`. The generated `README.txt` says so.
+**Correctness and durability**
+
+- [ ] `legacy verify --repair` to invoke `par2 repair` when a sealed blob
+      fails its check, instead of printing the command for the operator to
+      run by hand.
+- [ ] Detect a sealed tier that has drifted out of date — stories changed
+      since the last `seal` — and say so in `verify`. Right now a stale
+      bundle is silently stale.
+- [ ] Verify sidecar checksums against their media during `verify`.
+      `scripts/refresh-media.sh` does this today but nothing calls it.
+- [ ] Round-trip property tests over the frontmatter emitter and parser:
+      any story that renders must re-parse identically. The emitter is the
+      one place where a quoting bug would corrupt an archive silently.
+
+**Usability**
+
+- [ ] `legacy story edit` and `legacy story rm`. Editing means opening the
+      file by hand today, which is fine but undiscoverable.
+- [ ] `people/` and `places/` are created and sealed but nothing writes
+      them. A `legacy person add` would close the loop, and story
+      frontmatter already references them.
+- [ ] `legacy search <query>` exposing the FTS index directly, without
+      going through the replica or needing a model.
+- [ ] Media captions: the sidecar has a `caption` field that only a text
+      editor can currently fill in.
+- [ ] Shell completions, and a `--json` output mode so the CLI is as
+      scriptable as the REST API.
+
+**Keyholders**
+
+- [ ] `archive.yaml` has a `keyholders` list that nothing reads. It should
+      record who holds which share number, so an executor knows whom to
+      call — without storing anything that weakens the threshold.
+- [ ] A rehearsal command that checks a set of shares reconstructs the
+      right key *without* decrypting anything, so keyholders can practise
+      while the subject is alive to fix problems.
+
+**Larger, less certain**
+
+- [ ] Key rotation: re-seal with a fresh identity and reissue shares when
+      a keyholder is lost or replaced.
+- [ ] Embeddings-based retrieval as an option alongside FTS. FTS was the
+      right default because it is debuggable and needs no model; it is
+      weak on paraphrase.
+- [ ] Incremental sealing for archives large enough that re-tarring
+      everything is slow.

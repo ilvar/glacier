@@ -38,26 +38,27 @@ pub struct VoiceSettings {
 }
 
 impl VoiceSettings {
+    /// Read configuration from the environment, preferring the
+    /// `LEGACY_`-prefixed names and falling back to the conventional
+    /// `OPENAI_*` ones.
     pub fn from_env() -> VoiceSettings {
         VoiceSettings {
-            api_key: std::env::var("LEGACY_OPENAI_API_KEY")
-                .ok()
-                .or_else(|| std::env::var("OPENAI_API_KEY").ok()),
-            base_url: std::env::var("LEGACY_OPENAI_BASE_URL")
-                .unwrap_or_else(|_missing| DEFAULT_API_BASE.to_owned()),
-            stt_model: std::env::var("LEGACY_STT_MODEL")
-                .unwrap_or_else(|_missing| DEFAULT_STT_MODEL.to_owned()),
-            tts_model: std::env::var("LEGACY_TTS_MODEL")
-                .unwrap_or_else(|_missing| DEFAULT_TTS_MODEL.to_owned()),
-            tts_voice: std::env::var("LEGACY_TTS_VOICE")
-                .unwrap_or_else(|_missing| DEFAULT_TTS_VOICE.to_owned()),
+            api_key: crate::core::env::first(&["LEGACY_OPENAI_API_KEY", "OPENAI_API_KEY"]),
+            base_url: crate::core::env::first(&["LEGACY_OPENAI_BASE_URL", "OPENAI_BASE_URL"])
+                .unwrap_or_else(|| DEFAULT_API_BASE.to_owned()),
+            stt_model: crate::core::env::first(&["LEGACY_STT_MODEL"])
+                .unwrap_or_else(|| DEFAULT_STT_MODEL.to_owned()),
+            tts_model: crate::core::env::first(&["LEGACY_TTS_MODEL"])
+                .unwrap_or_else(|| DEFAULT_TTS_MODEL.to_owned()),
+            tts_voice: crate::core::env::first(&["LEGACY_TTS_VOICE"])
+                .unwrap_or_else(|| DEFAULT_TTS_VOICE.to_owned()),
         }
     }
 
     fn require_key(&self) -> Result<&str, VoiceError> {
         self.api_key.as_deref().ok_or_else(|| {
             VoiceError(
-                "No API key configured. Set LEGACY_OPENAI_API_KEY (or OPENAI_API_KEY) \
+                "No API key configured. Set LEGACY_OPENAI_API_KEY or OPENAI_API_KEY \
                  to use voice mode. Text mode works fully without it."
                     .to_owned(),
             )

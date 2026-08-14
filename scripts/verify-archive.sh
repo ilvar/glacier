@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify a legacy archive's integrity using only sha256sum and par2 -- no
-# Python, no `legacy` binary required. Run from inside the archive root, or
-# pass the archive root as the first argument.
+# other tooling and no `legacy` binary required. Run it from inside the
+# archive root, or pass the archive root as the first argument.
 #
 # Usage: verify-archive.sh [archive-root]
 

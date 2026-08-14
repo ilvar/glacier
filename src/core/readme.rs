@@ -11,7 +11,7 @@ use crate::core::vault::ArchiveConfig;
 
 /// The plain-bash verifier copied into every archive, so integrity can be
 /// checked with no Rust toolchain and no `legacy` binary.
-pub const VERIFY_SCRIPT: &str = include_str!("../templates/verify-archive.sh");
+pub const VERIFY_SCRIPT: &str = include_str!("../../scripts/verify-archive.sh");
 
 const HEADER: &str = r#"LEGACY ARCHIVE — READ THIS FIRST
 =================================
@@ -188,48 +188,52 @@ beyond `age` and a SLIP-0039 tool):
   a. Gather at least the threshold number of shares for the tier you want
      to open. Each share is a list of English words.
 
-  b. Reconstruct the age identity from the shares. Using the Python
-     "shamir-mnemonic" package (pip install shamir-mnemonic):
+  b. Combine the shares back into 32 secret bytes, using any SLIP-0039
+     implementation. The scheme is a published standard with independent
+     implementations in several languages; the specification is at
 
-       python3 -c "
-       import shamir_mnemonic as sm
-       shares = [
-           'share one words here...',
-           'share two words here...',
-           'share three words here...',
-       ]
-       secret = sm.combine_mnemonics(shares)
-       print(secret.hex())
-       "
+       https://github.com/satoshilabs/slips/blob/master/slip-0039.md
 
-     These shares use the original, non-extendable SLIP-0039 variant.
-     Recovery tools detect that automatically, so no extra flag is needed
-     to combine them; if you ever RE-SPLIT the key with the Python package
-     and want shares interchangeable with these, pass extendable=False.
+     and reference implementations are linked from it. This archive was
+     written using the Rust crate "sssmc39". Feed it the share word lists
+     exactly as written, with no passphrase, and it returns the 32 bytes.
 
-     Then convert those 32 raw bytes back into an age identity string by
+     These shares use the ORIGINAL, NON-EXTENDABLE SLIP-0039 variant.
+     Implementations detect that automatically when combining, so you do
+     not need a flag to read them. It matters only if you ever RE-SPLIT
+     this key and want the new shares interchangeable with these ones —
+     then select the non-extendable variant explicitly, because some
+     libraries now default to the newer extendable one.
+
+  c. Convert those 32 raw bytes back into an age identity string by
      Bech32-encoding them with the human-readable prefix "age-secret-key-",
-     and upper-casing the result. If you have the `legacy` program
-     available, `legacy unseal --share "..." --share "..."` does steps
-     (b) and (c) for you. Otherwise, any Bech32 implementation will do —
-     it is a simple checksummed encoding, described at
-     https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki
+     then upper-casing the result. Bech32 is a simple checksummed text
+     encoding, not a cipher, and is described at
 
-  c. Verify: SHA-256 the resulting identity string and compare it to the
+       https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki
+
+  d. Verify: SHA-256 the resulting identity string and compare it to the
      "SHA-256 of the correct reconstructed identity" line above for that
      tier. If it matches, you have the right key.
 
-  d. Decrypt with age:
+  e. Decrypt with age:
 
        age -d -i /path/to/identity.txt -o archive.tar sealed/<tier>.tar.age
 
      (put the reconstructed "AGE-SECRET-KEY-1..." string, and nothing
      else, in identity.txt)
 
-  e. Untar: tar -xf archive.tar
+  f. Untar: tar -xf archive.tar
 
-  f. The extracted files are ordinary Markdown, images, and audio — open
+  g. The extracted files are ordinary Markdown, images, and audio — open
      them with anything.
+
+If you happen to have the `legacy` program available, steps (b) through
+(f) are one command:
+
+  legacy unseal --share "..." --share "..."
+
+but the archive is designed so you never need it.
 
 
 5. INTEGRITY: CHECKSUMS AND BIT-ROT REPAIR
@@ -292,7 +296,11 @@ mod tests {
         assert!(text.contains("Jane Doe"));
         assert!(text.contains("age -d -i"));
         assert!(text.contains("sha256sum -c MANIFEST.sha256"));
-        assert!(text.contains("combine_mnemonics"));
+        // The recovery path must name the standard, not one ecosystem's
+        // library, so a reader in any language can follow it.
+        assert!(text.contains("slip-0039.md"));
+        assert!(text.contains("bip-0173"));
+        assert!(text.contains("tar -xf"));
     }
 
     #[test]
@@ -329,8 +337,26 @@ mod tests {
     #[test]
     fn documents_the_slip39_variant_for_a_future_reader() {
         // Shares from this program are the non-extendable variant; a future
-        // reader re-splitting the key needs to know that to stay compatible.
+        // reader re-splitting the key needs to know that to stay compatible,
+        // and a reader merely combining them needs to know it does not
+        // matter. Both halves of that have to be stated.
         let text = render(&ArchiveConfig::new("Jane Doe", 2, 3));
-        assert!(text.contains("extendable=False"));
+        assert!(text.contains("NON-EXTENDABLE"));
+        assert!(text.contains("detect that automatically"));
+        assert!(text.contains("RE-SPLIT"));
+    }
+
+    #[test]
+    fn the_recovery_path_names_no_single_language() {
+        // The archive outlives whatever language this program is written
+        // in, so its instructions must not depend on one being installed.
+        let text = render(&ArchiveConfig::new("Jane Doe", 2, 3));
+        let lowered = text.to_lowercase();
+        for ecosystem in ["python", "pip install", "python3 -c", "import "] {
+            assert!(
+                !lowered.contains(ecosystem),
+                "README.txt should not require {ecosystem:?}"
+            );
+        }
     }
 }
