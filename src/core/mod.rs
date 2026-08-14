@@ -8,8 +8,13 @@
 pub mod clock;
 pub mod crypto;
 pub mod dates;
+pub mod index;
+pub mod interview;
 pub mod manifest;
+pub mod media;
 pub mod readme;
+pub mod seal;
 pub mod story;
+pub mod timeline;
 pub mod vault;
 pub mod yaml;
