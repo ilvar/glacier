@@ -9,6 +9,7 @@ import typer
 from legacy.core import interview as interview_mod
 from legacy.core import manifest as manifest_mod
 from legacy.core import media as media_mod
+from legacy.core import seal as seal_mod
 from legacy.core import story as story_mod
 from legacy.core import timeline as timeline_mod
 from legacy.core.vault import Vault, VaultError
@@ -229,6 +230,96 @@ def media_ingest(
     for item in ingested:
         typer.echo(f"{item.source.name} -> {item.dest.relative_to(vault.root)}")
     typer.echo(f"Ingested {len(ingested)} file(s).")
+
+
+@app.command()
+def seal(
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+    tiers: str = typer.Option(
+        "family,executor-only", "--tiers", help="Comma-separated tiers to seal."
+    ),
+    plaintext_escrow: bool = typer.Option(
+        False,
+        "--plaintext-escrow",
+        help="Leave the family tier UNENCRYPTED under sealed/family/ (see README.txt section 6).",
+    ),
+    write_shares_to: Path | None = typer.Option(
+        None, "--write-shares-to", help="Also write shares to this file. Off by default."
+    ),
+):
+    """Encrypt each visibility tier into sealed/<tier>.tar.age and print its shares."""
+    vault = Vault.open(archive)
+    config = vault.load_config()
+    tier_names = [t.strip() for t in tiers.split(",") if t.strip()]
+
+    share_lines: list[str] = []
+    for tier in tier_names:
+        escrow = plaintext_escrow and tier == "family"
+        try:
+            result = seal_mod.seal_tier(vault, config, tier, plaintext_escrow=escrow)
+        except seal_mod.SealError as e:
+            _err(str(e))
+            return
+
+        if result.plaintext_escrow:
+            typer.secho(
+                f"\n[{tier}] plaintext escrow: {result.story_count} stories copied "
+                f"UNENCRYPTED to {result.output_path.relative_to(vault.root)}",
+                fg=typer.colors.YELLOW,
+            )
+            continue
+
+        typer.secho(f"\n[{tier}] sealed {result.story_count} stories.", fg=typer.colors.GREEN)
+        typer.echo(f"  {result.output_path.relative_to(vault.root)}")
+        if result.par2_path is None:
+            typer.secho(
+                "  warning: par2 not installed, no recovery data created", fg=typer.colors.YELLOW
+            )
+        typer.echo(f"  identity sha256: {result.identity_sha256}")
+        typer.echo(
+            f"  {len(result.shares)} shares generated, "
+            f"{config.tiers[tier].threshold} needed to unlock:"
+        )
+        for i, share in enumerate(result.shares, 1):
+            typer.echo(f"    share {i}: {share}")
+            share_lines.append(f"# {tier} share {i}\n{share}\n")
+
+    vault.save_config(config)
+    timeline_mod.rebuild_derived_state(vault)
+
+    if share_lines:
+        typer.secho(
+            "\nWARNING: shares were printed above ONLY. They are not stored anywhere in "
+            "this archive and cannot be recovered if lost. Distribute them to your "
+            "keyholders now.",
+            fg=typer.colors.RED,
+            bold=True,
+        )
+    if write_shares_to is not None:
+        write_shares_to.write_text("\n".join(share_lines), encoding="utf-8")
+        typer.secho(f"Also wrote shares to {write_shares_to}", fg=typer.colors.YELLOW)
+
+
+@app.command()
+def unseal(
+    share: list[str] = typer.Option(
+        ..., "--share", help="A share (repeat for each one). Needs the tier's threshold."
+    ),
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+    output: Path | None = typer.Option(
+        None, "--output", help="Base directory to extract into (default: <archive>/unsealed/)."
+    ),
+):
+    """Reconstruct a key from shares and decrypt the matching sealed tier."""
+    vault = Vault.open(archive)
+    config = vault.load_config()
+    try:
+        result = seal_mod.unseal(vault, config, share, output or (vault.root / "unsealed"))
+    except seal_mod.SealError as e:
+        _err(str(e))
+        return
+    typer.secho(f"Unlocked tier {result.tier!r}: {result.file_count} files", fg=typer.colors.GREEN)
+    typer.echo(f"Extracted to {result.output_dir}")
 
 
 @timeline_app.command("build")

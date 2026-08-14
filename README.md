@@ -53,6 +53,12 @@ legacy timeline build --archive ./my-archive
 
 # Check the archive against MANIFEST.sha256 (and par2 recovery data once sealed):
 legacy verify --archive ./my-archive
+
+# Encrypt the family and executor-only tiers; prints shares to the terminal ONLY:
+legacy seal --archive ./my-archive
+
+# Reconstruct a key from enough shares and decrypt the matching tier:
+legacy unseal --archive ./my-archive --share "..." --share "..."
 ```
 
 ## Archive format
@@ -230,12 +236,25 @@ alongside each sealed blob. A `--plaintext-escrow` flag is available per
 seal run for cases where losing the family's access is a bigger risk than
 the confidentiality it buys.
 
+`legacy seal` never touches or deletes the plaintext archive — it is purely
+additive. Your working copy stays exactly as it was; `sealed/<tier>.tar.age`
+is a distributable snapshot for keyholders. `people/`, `places/`, and
+`interviews/` (session transcripts and audio) are bundled into the
+**family** tier only, not duplicated into `executor-only` — they're shared
+reference material and raw interview sessions, which default to
+family-level sensitivity.
+
+`legacy unseal --share "..." --share "..."` reconstructs the identity from
+however many shares you give it, matches its SHA-256 against `archive.yaml`
+to figure out which tier it belongs to (no need to specify), and decrypts
+that tier into `<archive>/unsealed/<tier>/`.
+
 ## Build status
 
 - [x] Step 1: archive format, `init`, `story add`/`list`
 - [x] Step 2: `timeline build`, SQLite FTS index, `verify`, generated README.txt
 - [x] Step 3: `media ingest`
 - [x] Step 4: interview subsystem (text mode)
-- [ ] Step 5: `seal`/`unseal`
+- [x] Step 5: `seal`/`unseal`
 - [ ] Step 6: REST API
 - [ ] Step 7: LLM tagging, voice mode, replica (`ask`)

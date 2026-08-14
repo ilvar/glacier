@@ -47,6 +47,10 @@ class Identity:
         return hashlib.sha256(self.identity.encode("ascii")).hexdigest()
 
 
+def identity_sha256(identity: str) -> str:
+    return hashlib.sha256(identity.strip().encode("ascii")).hexdigest()
+
+
 def generate_identity() -> Identity:
     """Generate a fresh age identity via `age-keygen`."""
     age_keygen = _require("age-keygen")

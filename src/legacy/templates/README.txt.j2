@@ -119,9 +119,13 @@ once, at seal time, and given to trusted keyholders. This archive does not
 store them.
 
 {% for name, tier in config.tiers.items() %}
-  Tier "{{ name }}": {{ tier.threshold }} of {{ tier.shares }} shares are
-  required to reconstruct the key.
-  {% if tier.identity_sha256 %}
+  Tier "{{ name }}": {{ tier.threshold }} of {{ tier.shares }} shares are required
+  to reconstruct the key.
+  {% if tier.plaintext_escrow %}
+  This tier was sealed with plaintext escrow: its files are UNENCRYPTED,
+  plain Markdown/media, under sealed/{{ name }}/ -- there is no key to
+  reconstruct for it.
+  {% elif tier.identity_sha256 %}
   SHA-256 of the correct reconstructed identity: {{ tier.identity_sha256 }}
   (compare against this BEFORE concluding the archive is corrupt — if your
   reconstructed key's hash matches this, the key is right and any decrypt
