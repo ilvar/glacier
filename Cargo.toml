@@ -1,0 +1,52 @@
+[package]
+name = "legacy"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97.1"
+publish = false
+description = "A self-hosted life-story vault and digital replica"
+
+[dependencies]
+# Serialization for the on-disk formats (archive.yaml, story frontmatter,
+# media sidecars, interview banks) and for JSON over HTTP.
+serde = { version = "1", features = ["derive"] }
+serde_yaml_ng = "0.10"
+serde_json = "1"
+# Checksums for MANIFEST.sha256 and media sidecars.
+sha2 = "0.11"
+# Text encoding of age identities, so the raw key bytes can be split.
+# This is a plain data encoding, not a cryptographic primitive.
+bech32 = "0.12"
+# SLIP-0039 threshold secret sharing. We use this library rather than
+# implementing any part of the scheme ourselves.
+sssmc39 = "0.0.3"
+# Sealing bundles files into an ordinary tar before encryption.
+tar = "0.4"
+# Rebuildable full-text search index. Bundled so FTS5 is always present.
+rusqlite = { version = "0.40", features = ["bundled"] }
+# Directory traversal for the manifest and media ingest.
+walkdir = "2"
+# Blocking HTTP: a localhost-only API server and an outbound client for the
+# opt-in LLM and speech features.
+tiny_http = "0.12"
+ureq = "3"
+# Scratch directories for sealing; never part of the archive itself.
+tempfile = "3"
+
+[dev-dependencies]
+proptest = { version = "=1.11.0", default-features = false, features = ["std"] }
+
+[lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+as_conversions = "deny"
+wildcard_imports = "deny"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

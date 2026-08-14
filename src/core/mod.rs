@@ -1,0 +1,15 @@
+//! The archive formats and the operations over them.
+//!
+//! Everything here reads and writes plain files. No module in `core` holds
+//! state between calls, and the SQLite index in `index` is the only
+//! derived artefact that is not itself human-readable — it can be deleted
+//! at any time and rebuilt from the Markdown files.
+
+pub mod clock;
+pub mod crypto;
+pub mod dates;
+pub mod manifest;
+pub mod readme;
+pub mod story;
+pub mod vault;
+pub mod yaml;
