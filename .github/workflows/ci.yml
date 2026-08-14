@@ -166,8 +166,10 @@ jobs:
           BIN="target/${{ matrix.target }}/release/${{ matrix.binary }}"
           file "$BIN"
           file "$BIN" | grep -q "ARM aarch64"
-          file "$BIN" | grep -q "statically linked"
-          # A dynamic dependency here would mean musl did not get linked in.
+          # Rust musl builds come out as "static-pie linked" rather than
+          # "statically linked", so accept either spelling.
+          file "$BIN" | grep -Eq "static-pie linked|statically linked"
+          # A resolved dependency here would mean musl did not get linked in.
           if ldd "$BIN" 2>&1 | grep -q "=>"; then
             echo "expected a static binary, but it has dynamic dependencies" >&2
             exit 1
