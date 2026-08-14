@@ -372,5 +372,21 @@ def verify(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def serve(
+    host: str = typer.Option(
+        "127.0.0.1", "--host", help="Bind address. Localhost only by default."
+    ),
+    port: int = typer.Option(8000, "--port", help="Port to listen on."),
+):
+    """Run the REST API (mirrors this CLI 1:1). No auth -- localhost only by default;
+    put a reverse proxy with auth in front if you expose this beyond your own machine."""
+    import uvicorn
+
+    from legacy.api import app as fastapi_app
+
+    uvicorn.run(fastapi_app, host=host, port=port)
+
+
 if __name__ == "__main__":
     app()

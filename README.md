@@ -249,6 +249,32 @@ however many shares you give it, matches its SHA-256 against `archive.yaml`
 to figure out which tier it belongs to (no need to specify), and decrypts
 that tier into `<archive>/unsealed/<tier>/`.
 
+## REST API
+
+`legacy serve` runs a FastAPI app that mirrors the CLI 1:1 (JSON in, JSON
+out), bound to `127.0.0.1` by default. There is no authentication in v1 —
+it's meant for a single local user (e.g. a future GUI) driving the same
+machine, not a multi-tenant service. If you expose it beyond localhost,
+put a reverse proxy with auth in front yourself. There's no server-side
+session state beyond the interview session id, which is just the filename
+of an already-persisted session file.
+
+```bash
+legacy serve --port 8000
+
+curl -X POST localhost:8000/stories -H 'content-type: application/json' -d '{
+  "archive": "./my-archive", "title": "Starting university", "date": "1994-09-15"
+}'
+curl "localhost:8000/stories?archive=./my-archive&year=1994"
+```
+
+Routes: `POST /init`, `POST /stories`, `GET /stories`, `POST /timeline/build`,
+`GET /verify`, `POST /media/ingest`, `POST /interviews`,
+`GET /interviews/{id}`, `POST /interviews/{id}/answer`,
+`POST /interviews/{id}/skip`, `POST /seal`, `POST /unseal`. `POST /seal`'s
+response body contains the shares — same "printed once, never stored"
+rule as the CLI, just delivered over HTTP instead of the terminal.
+
 ## Build status
 
 - [x] Step 1: archive format, `init`, `story add`/`list`
@@ -256,5 +282,5 @@ that tier into `<archive>/unsealed/<tier>/`.
 - [x] Step 3: `media ingest`
 - [x] Step 4: interview subsystem (text mode)
 - [x] Step 5: `seal`/`unseal`
-- [ ] Step 6: REST API
+- [x] Step 6: REST API
 - [ ] Step 7: LLM tagging, voice mode, replica (`ask`)
