@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from legacy.core import manifest as manifest_mod
+from legacy.core import media as media_mod
 from legacy.core import story as story_mod
 from legacy.core import timeline as timeline_mod
 from legacy.core.vault import Vault, VaultError
@@ -14,8 +15,10 @@ from legacy.core.vault import Vault, VaultError
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 story_app = typer.Typer(no_args_is_help=True, help="Manage story files.")
 timeline_app = typer.Typer(no_args_is_help=True, help="Chronological index and search.")
+media_app = typer.Typer(no_args_is_help=True, help="Ingest and manage media files.")
 app.add_typer(story_app, name="story")
 app.add_typer(timeline_app, name="timeline")
+app.add_typer(media_app, name="media")
 
 
 def _err(msg: str) -> None:
@@ -108,6 +111,41 @@ def story_list(
             continue
         date_label = story.date or "undated"
         typer.echo(f"{story.id}\t{date_label}\t{story.visibility}\t{story.title}")
+
+
+@media_app.command("ingest")
+def media_ingest(
+    source: Path = typer.Argument(..., help="Directory of media files to ingest."),
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+    date_from_exif: bool = typer.Option(
+        False, "--date-from-exif", help="Try to read a capture date from embedded metadata."
+    ),
+    date: str | None = typer.Option(
+        None, "--date", help="Override date for every file ingested this run (YYYY[-MM[-DD]])."
+    ),
+    visibility: str = typer.Option(
+        "family", "--visibility", help="public | family | executor-only"
+    ),
+):
+    """Copy media files into the archive with a metadata sidecar per file."""
+    vault = Vault.open(archive)
+    try:
+        ingested = media_mod.ingest_directory(
+            source,
+            vault.media_dir,
+            date_from_exif=date_from_exif,
+            manual_date=date,
+            visibility=visibility,
+        )
+    except media_mod.MediaError as e:
+        _err(str(e))
+        return
+    if not ingested:
+        typer.echo(f"No media files found under {source}")
+        return
+    for item in ingested:
+        typer.echo(f"{item.source.name} -> {item.dest.relative_to(vault.root)}")
+    typer.echo(f"Ingested {len(ingested)} file(s).")
 
 
 @timeline_app.command("build")

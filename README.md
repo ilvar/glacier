@@ -122,6 +122,34 @@ Rules the code enforces:
 - `visibility` gates which encrypted tier (if any) a story ends up in when
   the archive is sealed, and what the replica is allowed to discuss.
 
+### Media sidecar format
+
+Every file under `media/` has a same-named `.yaml` sidecar recording what the
+program knows about it -- the original is never modified or transcoded:
+
+```yaml
+original_filename: IMG_0001.JPG
+ingested_at: '2026-08-14T16:40:10Z'
+sha256: 53d5e412...
+size_bytes: 6699
+mime_type: image/jpeg
+date: '1994-09-15'
+date_precision: day
+date_source: manual        # exif | filesystem | manual | unknown
+width: 3000
+height: 2000
+duration_seconds: null
+visibility: family
+caption: null               # free text, edit by hand
+```
+
+`legacy media ingest <dir> [--date-from-exif] [--date YYYY[-MM[-DD]]] [--visibility ...]`
+copies every recognized media file from `<dir>` into `media/<year>/`, named
+`<date>-<slug-of-original-name>-NNN.<ext>` (or `media/undated/...` if no date
+is known), and writes its sidecar. `--date-from-exif` best-effort reads a
+capture date via `ffprobe`; without it (or if nothing is found), the date is
+left `unknown` until you either pass `--date` or hand-edit the sidecar YAML.
+
 ### archive.yaml
 
 ```yaml
@@ -169,7 +197,7 @@ the confidentiality it buys.
 
 - [x] Step 1: archive format, `init`, `story add`/`list`
 - [x] Step 2: `timeline build`, SQLite FTS index, `verify`, generated README.txt
-- [ ] Step 3: `media ingest`
+- [x] Step 3: `media ingest`
 - [ ] Step 4: interview subsystem (text mode)
 - [ ] Step 5: `seal`/`unseal`
 - [ ] Step 6: REST API
