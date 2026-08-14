@@ -46,6 +46,13 @@ legacy init ./my-archive --subject "Jane Doe" --threshold 3 --shares 5
 legacy story add --archive ./my-archive --title "Starting university" --date 1994-09-15 \
     --tags education,leaving-home --body "I packed one suitcase and took the train."
 legacy story list --archive ./my-archive
+
+# Regenerate timeline.md, the search index, MANIFEST.sha256, and README.txt
+# after adding stories or editing archive.yaml:
+legacy timeline build --archive ./my-archive
+
+# Check the archive against MANIFEST.sha256 (and par2 recovery data once sealed):
+legacy verify --archive ./my-archive
 ```
 
 ## Archive format
@@ -53,8 +60,10 @@ legacy story list --archive ./my-archive
 ```
 my-archive/
   README.txt                  # unencrypted, always. Explains everything below.
+  verify-archive.sh           # plain-bash integrity check, no `legacy` install required
   archive.yaml                # subject name, schema version, per-tier encryption config
   MANIFEST.sha256              # sha256sum-compatible checksum list
+  timeline.md                  # generated chronological index (legacy timeline build)
   timeline/
     1978/
       1978-03-anecdote-first-bicycle.md
@@ -159,7 +168,7 @@ the confidentiality it buys.
 ## Build status
 
 - [x] Step 1: archive format, `init`, `story add`/`list`
-- [ ] Step 2: `timeline build`, SQLite FTS index, `verify`, generated README.txt
+- [x] Step 2: `timeline build`, SQLite FTS index, `verify`, generated README.txt
 - [ ] Step 3: `media ingest`
 - [ ] Step 4: interview subsystem (text mode)
 - [ ] Step 5: `seal`/`unseal`

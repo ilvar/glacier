@@ -35,6 +35,12 @@ encrypted and always remain in `timeline/` as plain files.
                        (see section 5). Used to detect corruption or
                        accidental edits.
 
+  timeline.md          A single, generated, human-readable index of every
+                       story in chronological order. Purely a convenience —
+                       delete it and it will be regenerated the next time
+                       `legacy timeline build` runs; the files under
+                       timeline/ remain the source of truth.
+
   timeline/            Story files, one per Markdown (.md) file, grouped
                        into folders by year (e.g. timeline/1994/), or under
                        timeline/undated/ if the story has no known date.
@@ -175,10 +181,18 @@ beyond `age` and a SLIP-0039 tool):
 ---------------------------------------------
 
 MANIFEST.sha256 lists a SHA-256 checksum for every file in this archive as
-of the last time `legacy verify` or `legacy seal` ran. To check the whole
-archive against it:
+of the last time `legacy timeline build` or `legacy seal` ran. To check the
+whole archive against it, with no tools beyond `sha256sum`:
 
   cd (this directory) && sha256sum -c MANIFEST.sha256
+
+Or run the plain-bash script shipped in this archive:
+
+  ./verify-archive.sh
+
+which checks MANIFEST.sha256 and, if present, the par2 recovery data under
+sealed/ -- no Python or `legacy` install required. `legacy verify` does the
+same thing if you have the program installed.
 
 Each sealed/<tier>.tar.age file also has recovery data alongside it,
 created with `par2` (15% redundancy), covering small amounts of bit rot or

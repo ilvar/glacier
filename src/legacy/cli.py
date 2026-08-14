@@ -6,12 +6,16 @@ from pathlib import Path
 
 import typer
 
+from legacy.core import manifest as manifest_mod
 from legacy.core import story as story_mod
+from legacy.core import timeline as timeline_mod
 from legacy.core.vault import Vault, VaultError
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 story_app = typer.Typer(no_args_is_help=True, help="Manage story files.")
+timeline_app = typer.Typer(no_args_is_help=True, help="Chronological index and search.")
 app.add_typer(story_app, name="story")
+app.add_typer(timeline_app, name="timeline")
 
 
 def _err(msg: str) -> None:
@@ -104,6 +108,56 @@ def story_list(
             continue
         date_label = story.date or "undated"
         typer.echo(f"{story.id}\t{date_label}\t{story.visibility}\t{story.title}")
+
+
+@timeline_app.command("build")
+def timeline_build(
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+):
+    """Regenerate timeline.md, the search index, MANIFEST.sha256, and README.txt."""
+    vault = Vault.open(archive)
+    result = timeline_mod.rebuild_derived_state(vault)
+    typer.echo(f"Indexed {result.story_count} stories.")
+    typer.echo(f"Wrote {result.timeline_path.relative_to(vault.root)}")
+    typer.echo(f"Wrote {result.manifest_path.relative_to(vault.root)}")
+    typer.echo(f"Wrote {result.readme_path.relative_to(vault.root)}")
+
+
+@app.command()
+def verify(
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+):
+    """Check MANIFEST.sha256 against the files on disk, and par2-verify sealed blobs."""
+    vault = Vault.open(archive)
+    problems = manifest_mod.verify_manifest(vault.root)
+    for rel, reason in problems:
+        typer.secho(f"FAIL  {rel}: {reason}", fg=typer.colors.RED)
+    if not problems:
+        typer.secho("OK    MANIFEST.sha256 matches all files", fg=typer.colors.GREEN)
+
+    from legacy.core import crypto
+
+    if vault.sealed_dir.exists():
+        for par2_file in sorted(vault.sealed_dir.glob("*.par2")):
+            if par2_file.name.count(".") > 1 and not par2_file.name.endswith(".tar.age.par2"):
+                continue  # skip the .vol*.par2 recovery-block files, only check the index
+            try:
+                ok = crypto.par2_verify(par2_file)
+            except crypto.CryptoError as e:
+                typer.secho(f"WARN  {par2_file.name}: {e}", fg=typer.colors.YELLOW)
+                continue
+            if ok:
+                typer.secho(
+                    f"OK    {par2_file.name} recovery data intact", fg=typer.colors.GREEN
+                )
+            else:
+                typer.secho(
+                    f"FAIL  {par2_file.name} recovery data check failed", fg=typer.colors.RED
+                )
+                problems.append((par2_file, "par2 verification failed"))
+
+    if problems:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

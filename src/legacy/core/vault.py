@@ -174,11 +174,19 @@ class Vault:
         )
         vault = cls(root)
         vault.save_config(config)
-        vault.manifest_path.touch()
 
         from legacy.core.readme import render_readme
 
         vault.readme_path.write_text(render_readme(config), encoding="utf-8")
+
+        script_src = Path(__file__).resolve().parent.parent / "templates" / "verify-archive.sh"
+        script_dst = root / "verify-archive.sh"
+        script_dst.write_text(script_src.read_text(encoding="utf-8"), encoding="utf-8")
+        script_dst.chmod(0o755)
+
+        from legacy.core.manifest import write_manifest
+
+        write_manifest(root)
         return vault
 
     @classmethod
