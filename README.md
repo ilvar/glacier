@@ -249,6 +249,59 @@ however many shares you give it, matches its SHA-256 against `archive.yaml`
 to figure out which tier it belongs to (no need to specify), and decrypts
 that tier into `<archive>/unsealed/<tier>/`.
 
+## LLM tagging, voice mode, and the replica
+
+All three are optional, opt-in per invocation, and require network access
+and credentials -- everything else in this program (recording, organizing,
+sealing, decrypting) works with zero network access. They live in
+`core/llm.py` and `core/voice.py`, which nothing else in the program
+imports; the replica in particular is a *reader* of the archive, not a
+component of it, and can be deleted entirely without losing anything else.
+
+**Tagging and the replica** (`core/llm.py`) talk to any OpenAI-compatible
+endpoint, so a local model server works too:
+
+```bash
+export LEGACY_LLM_API_KEY=sk-...
+export LEGACY_LLM_BASE_URL=http://localhost:8080/v1   # optional: local model
+export LEGACY_LLM_MODEL=gpt-4o-mini                     # optional, this is the default
+
+legacy tag --archive ./my-archive                # preview suggested tags (default)
+legacy tag --archive ./my-archive --apply         # write them; sets tags_generated_by
+
+legacy ask "What did you do after school?" --archive ./my-archive
+```
+
+`ask` retrieves candidate stories with the SQLite FTS index (`timeline build`
+must have run at least once), builds a keyword-OR query from the question
+so a full sentence still finds matches, then asks the model to answer using
+*only* those stories, quoting the subject's own words where possible.
+Unsupported questions get refused ("they never talked about that with me")
+rather than answered from the model's imagination. Every answer that isn't
+a refusal cites the story ids it drew on. The replica can never surface
+`executor-only` material — that restriction is hard-coded, not a flag — and
+`archive.yaml`'s `replica.sunset` date, if set, makes `ask` refuse to run
+at all once passed.
+
+**Voice mode** (`core/voice.py`) is OpenAI-specific (Whisper for
+speech-to-text, TTS for playback), since the spec calls for those two APIs
+by name rather than a swappable endpoint:
+
+```bash
+export LEGACY_OPENAI_API_KEY=sk-...        # or OPENAI_API_KEY
+legacy interview start childhood --archive ./my-archive --voice
+```
+
+Recording shells out to `ffmpeg` against the system microphone (push a key
+to start, again to stop); the WAV is saved as
+`interviews/<session-id>-<question-id>.wav` — one file per question rather
+than per session, so a session can be paused and resumed across multiple
+sittings without needing to append to an in-progress recording — and is
+never discarded after transcription. `--suggest-followups` (works in text
+or voice mode) asks the model for one optional follow-up question after
+each answer, clearly marked as a suggestion; the question bank drives the
+interview either way and works fully without it.
+
 ## REST API
 
 `legacy serve` runs a FastAPI app that mirrors the CLI 1:1 (JSON in, JSON
@@ -271,9 +324,12 @@ curl "localhost:8000/stories?archive=./my-archive&year=1994"
 Routes: `POST /init`, `POST /stories`, `GET /stories`, `POST /timeline/build`,
 `GET /verify`, `POST /media/ingest`, `POST /interviews`,
 `GET /interviews/{id}`, `POST /interviews/{id}/answer`,
-`POST /interviews/{id}/skip`, `POST /seal`, `POST /unseal`. `POST /seal`'s
-response body contains the shares — same "printed once, never stored"
-rule as the CLI, just delivered over HTTP instead of the terminal.
+`POST /interviews/{id}/skip`, `POST /seal`, `POST /unseal`, `POST /tag`,
+`POST /ask`. `POST /seal`'s response body contains the shares — same
+"printed once, never stored" rule as the CLI, just delivered over HTTP
+instead of the terminal. `/tag` and `/ask` need `LEGACY_LLM_API_KEY` set,
+same as their CLI counterparts; voice mode has no HTTP route since it needs
+a local microphone.
 
 ## Build status
 
@@ -283,4 +339,4 @@ rule as the CLI, just delivered over HTTP instead of the terminal.
 - [x] Step 4: interview subsystem (text mode)
 - [x] Step 5: `seal`/`unseal`
 - [x] Step 6: REST API
-- [ ] Step 7: LLM tagging, voice mode, replica (`ask`)
+- [x] Step 7: LLM tagging, voice mode, replica (`ask`)

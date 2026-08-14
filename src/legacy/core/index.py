@@ -8,10 +8,22 @@ step (llm.py) don't have to re-parse every file on every query.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
 from legacy.core.story import Story, iter_stories
+
+# FTS5 query syntax treats characters like ? ( ) " : - * as operators/syntax,
+# so free-form user text (e.g. a question ending in "?") can raise a syntax
+# error. Strip anything that isn't a word character or whitespace; this
+# still allows the bare AND/OR/NOT boolean keywords FTS5 recognizes.
+_UNSAFE_FTS_CHARS = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def _sanitize_fts_query(query: str) -> str:
+    cleaned = " ".join(_UNSAFE_FTS_CHARS.sub(" ", query).split())
+    return cleaned or query
 
 _SCHEMA = """
 CREATE VIRTUAL TABLE IF NOT EXISTS stories USING fts5(
@@ -82,7 +94,7 @@ def search(
             "snippet(stories, 2, '[', ']', '...', 12) AS snippet "
             "FROM stories WHERE stories MATCH ?"
         )
-        params: list = [query]
+        params: list = [_sanitize_fts_query(query)]
         if visibilities is not None:
             placeholders = ",".join("?" for _ in visibilities)
             sql += f" AND visibility IN ({placeholders})"

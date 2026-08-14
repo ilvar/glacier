@@ -18,6 +18,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from legacy.core import interview as interview_mod
+from legacy.core import llm as llm_mod
 from legacy.core import manifest as manifest_mod
 from legacy.core import media as media_mod
 from legacy.core import seal as seal_mod
@@ -353,6 +354,80 @@ def interview_skip(session_id: str, req: ArchiveRequest) -> SessionInfo:
     except interview_mod.InterviewError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return _session_info(session, bank)
+
+
+# -------------------------------------------------------------------- llm --
+
+
+class TagRequest(BaseModel):
+    archive: str
+    apply: bool = False
+
+
+class TagSuggestionInfo(BaseModel):
+    story_id: str
+    current_tags: list[str]
+    suggested_tags: list[str]
+    new_tags: list[str]
+    applied: bool
+
+
+@app.post("/tag", response_model=list[TagSuggestionInfo])
+def tag_stories(req: TagRequest) -> list[TagSuggestionInfo]:
+    vault = _open(req.archive)
+    settings = llm_mod.LLMSettings.from_env()
+    try:
+        suggestions = llm_mod.suggest_tags_for_archive(settings, vault.root)
+    except llm_mod.LLMError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    results = []
+    for suggestion in suggestions:
+        applied = False
+        if req.apply and suggestion.new_tags:
+            story = next(
+                s for s in story_mod.iter_stories(vault.root) if s.id == suggestion.story_id
+            )
+            llm_mod.apply_tag_suggestion(vault.root, story, suggestion, settings.model)
+            applied = True
+        results.append(
+            TagSuggestionInfo(
+                story_id=suggestion.story_id,
+                current_tags=suggestion.current_tags,
+                suggested_tags=suggestion.suggested_tags,
+                new_tags=suggestion.new_tags,
+                applied=applied,
+            )
+        )
+    return results
+
+
+class AskRequest(BaseModel):
+    archive: str
+    question: str
+
+
+class AskResponse(BaseModel):
+    answer: str
+    cited_story_ids: list[str]
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask_replica(req: AskRequest) -> AskResponse:
+    vault = _open(req.archive)
+    config = vault.load_config()
+    settings = llm_mod.LLMSettings.from_env()
+    try:
+        result = llm_mod.ask(
+            settings,
+            vault.root,
+            vault.index_db_path,
+            req.question,
+            replica_sunset=config.replica_sunset,
+        )
+    except llm_mod.LLMError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return AskResponse(answer=result.answer, cited_story_ids=result.cited_story_ids)
 
 
 # ------------------------------------------------------------------ seal --

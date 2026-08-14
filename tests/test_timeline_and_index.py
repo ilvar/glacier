@@ -38,6 +38,16 @@ def test_rebuild_index_and_search(tmp_path):
     assert any(r["id"] == "1994-09-15-starting-university" for r in results)
 
 
+def test_search_tolerates_punctuation_in_query(tmp_path):
+    vault = _seed_archive(tmp_path)
+    index_mod.rebuild_index(vault.root, vault.index_db_path)
+
+    # A question mark (and other FTS5 syntax characters) must not raise --
+    # the replica passes raw user questions straight through to search().
+    results = index_mod.search(vault.index_db_path, "university?")
+    assert any(r["id"] == "1994-09-15-starting-university" for r in results)
+
+
 def test_search_respects_visibility_filter(tmp_path):
     vault = Vault.init(tmp_path / "arch", subject_name="Jane Doe")
     save_story(

@@ -7,11 +7,13 @@ from pathlib import Path
 import typer
 
 from legacy.core import interview as interview_mod
+from legacy.core import llm as llm_mod
 from legacy.core import manifest as manifest_mod
 from legacy.core import media as media_mod
 from legacy.core import seal as seal_mod
 from legacy.core import story as story_mod
 from legacy.core import timeline as timeline_mod
+from legacy.core import voice as voice_mod
 from legacy.core.vault import Vault, VaultError
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -117,9 +119,69 @@ def story_list(
         typer.echo(f"{story.id}\t{date_label}\t{story.visibility}\t{story.title}")
 
 
-def _run_interview_loop(vault: Vault, session, bank) -> None:
+def _get_text_answer() -> str | None:
+    """Reads lines until 'END'. Returns None for SKIP, raises _Quit for QUIT."""
+    lines: list[str] = []
+    while True:
+        try:
+            line = input("> ")
+        except EOFError:
+            raise _Quit() from None
+        stripped = line.strip()
+        if not lines and stripped.upper() == "SKIP":
+            return None
+        if not lines and stripped.upper() == "QUIT":
+            raise _Quit()
+        if stripped.upper() == "END":
+            return "\n".join(lines)
+        lines.append(line)
+
+
+def _get_voice_answer(vault: Vault, session, question, voice_settings) -> str | None:
+    typer.echo("Type SKIP or QUIT, or press Enter to start recording.")
+    try:
+        first = input("> ").strip().upper()
+    except EOFError:
+        raise _Quit() from None
+    if first == "SKIP":
+        return None
+    if first == "QUIT":
+        raise _Quit()
+
+    wav_path = vault.interviews_dir / f"{session.session_id}-{question.id}.wav"
+    try:
+        voice_mod.record_to_wav(wav_path)
+        transcript = voice_mod.transcribe(voice_settings, wav_path)
+    except voice_mod.VoiceError as e:
+        _err(str(e))
+        raise _Quit() from None
+    typer.echo(f"Transcript: {transcript}")
+    confirm = input("Use this? [Y/n] ").strip().lower()
+    if confirm == "n":
+        typer.echo("Not saved; the recording is kept, resume this session to try again.\n")
+        return None
+    return transcript
+
+
+class _Quit(Exception):
+    pass
+
+
+def _run_interview_loop(
+    vault: Vault,
+    session,
+    bank,
+    *,
+    voice: bool = False,
+    voice_settings=None,
+    suggest_followups: bool = False,
+    llm_settings=None,
+) -> None:
     typer.echo(f"Session {session.session_id!r} ({bank.description})")
-    typer.echo("Answer each question, then finish with a line containing just 'END'.")
+    if voice:
+        typer.echo("Voice mode: press Enter to record, Enter again to stop.")
+    else:
+        typer.echo("Answer each question, then finish with a line containing just 'END'.")
     typer.echo("Type 'SKIP' alone to skip a question, or 'QUIT' to stop for now.\n")
 
     while True:
@@ -133,55 +195,79 @@ def _run_interview_loop(vault: Vault, session, bank) -> None:
         for followup in question.followups:
             typer.echo(f"    ({followup})")
 
-        lines: list[str] = []
-        while True:
+        try:
+            answer = (
+                _get_voice_answer(vault, session, question, voice_settings)
+                if voice
+                else _get_text_answer()
+            )
+        except _Quit:
+            typer.echo(
+                f"\nStopped. Resume later with: legacy interview resume {session.session_id}"
+            )
+            return
+
+        if answer is None:
+            interview_mod.skip_question(vault.root, session, question)
+            typer.echo("(skipped)\n")
+            continue
+
+        story = interview_mod.record_answer(vault.root, session, bank, question, answer)
+        typer.echo(f"Saved {story.relative_path()}\n")
+
+        if suggest_followups and llm_settings is not None:
             try:
-                line = input("> ")
-            except EOFError:
-                line = "QUIT"
-            stripped = line.strip()
-            if not lines and stripped.upper() == "SKIP":
-                interview_mod.skip_question(vault.root, session, question)
-                typer.echo("(skipped)\n")
-                break
-            if not lines and stripped.upper() == "QUIT":
-                typer.echo(
-                    f"\nStopped. Resume later with: legacy interview resume {session.session_id}"
+                followup = llm_mod.suggest_followup(llm_settings, question.prompt, answer)
+                typer.secho(
+                    f"[AI-suggested follow-up, optional]: {followup}\n", fg=typer.colors.CYAN
                 )
-                return
-            if stripped.upper() == "END":
-                answer = "\n".join(lines)
-                story = interview_mod.record_answer(vault.root, session, bank, question, answer)
-                typer.echo(f"Saved {story.relative_path()}\n")
-                break
-            lines.append(line)
+            except llm_mod.LLMError:
+                pass
 
 
 @interview_app.command("start")
 def interview_start(
     bank_name: str = typer.Argument(..., help="Question bank name, e.g. 'childhood'."),
     archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
-    voice: bool = typer.Option(False, "--voice", help="Record and transcribe answers with speech."),
+    voice: bool = typer.Option(
+        False, "--voice", help="Record and transcribe answers with speech."
+    ),
+    suggest_followups: bool = typer.Option(
+        False,
+        "--suggest-followups",
+        help="Ask an LLM to suggest one optional follow-up per answer.",
+    ),
 ):
     """Start a new interview session from a question bank."""
     vault = Vault.open(archive)
-    if voice:
-        _err("Voice mode is not implemented yet; run without --voice.")
-        return
     try:
         bank = interview_mod.load_bank(bank_name)
-        session = interview_mod.new_session(vault.root, bank_name, mode="text")
+        mode = "voice" if voice else "text"
+        session = interview_mod.new_session(vault.root, bank_name, mode=mode)
     except interview_mod.InterviewError as e:
         _err(str(e))
         return
     interview_mod.save_session(vault.root, session)
-    _run_interview_loop(vault, session, bank)
+    _run_interview_loop(
+        vault,
+        session,
+        bank,
+        voice=voice,
+        voice_settings=voice_mod.VoiceSettings.from_env() if voice else None,
+        suggest_followups=suggest_followups,
+        llm_settings=llm_mod.LLMSettings.from_env() if suggest_followups else None,
+    )
 
 
 @interview_app.command("resume")
 def interview_resume(
     session_id: str = typer.Argument(..., help="Session id, e.g. 2026-08-14-childhood-session-01."),
     archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+    suggest_followups: bool = typer.Option(
+        False,
+        "--suggest-followups",
+        help="Ask an LLM to suggest one optional follow-up per answer.",
+    ),
 ):
     """Resume an existing interview session."""
     vault = Vault.open(archive)
@@ -194,7 +280,16 @@ def interview_resume(
     if session.status == "complete":
         typer.echo(f"Session {session_id!r} is already complete.")
         return
-    _run_interview_loop(vault, session, bank)
+    voice = session.mode == "voice"
+    _run_interview_loop(
+        vault,
+        session,
+        bank,
+        voice=voice,
+        voice_settings=voice_mod.VoiceSettings.from_env() if voice else None,
+        suggest_followups=suggest_followups,
+        llm_settings=llm_mod.LLMSettings.from_env() if suggest_followups else None,
+    )
 
 
 @media_app.command("ingest")
@@ -333,6 +428,67 @@ def timeline_build(
     typer.echo(f"Wrote {result.timeline_path.relative_to(vault.root)}")
     typer.echo(f"Wrote {result.manifest_path.relative_to(vault.root)}")
     typer.echo(f"Wrote {result.readme_path.relative_to(vault.root)}")
+
+
+@app.command()
+def tag(
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+    dry_run: bool = typer.Option(
+        True, "--dry-run/--apply", help="Preview suggestions without writing (default)."
+    ),
+):
+    """Suggest tags for stories via an LLM. Always previewable with --dry-run (the default)."""
+    vault = Vault.open(archive)
+    settings = llm_mod.LLMSettings.from_env()
+    try:
+        suggestions = llm_mod.suggest_tags_for_archive(settings, vault.root)
+    except llm_mod.LLMError as e:
+        _err(str(e))
+        return
+
+    if not suggestions:
+        typer.echo("No stories need tagging (all already have model-suggested tags).")
+        return
+
+    for suggestion in suggestions:
+        if not suggestion.new_tags:
+            continue
+        typer.echo(f"{suggestion.story_id}: +{', '.join(suggestion.new_tags)}")
+        if not dry_run:
+            from legacy.core.story import iter_stories as _iter
+
+            story = next(s for s in _iter(vault.root) if s.id == suggestion.story_id)
+            llm_mod.apply_tag_suggestion(vault.root, story, suggestion, settings.model)
+
+    if dry_run:
+        typer.echo("\n(dry run: nothing written. Re-run with --apply to save these tags.)")
+    else:
+        typer.echo(f"\nApplied tags to {sum(1 for s in suggestions if s.new_tags)} stories.")
+
+
+@app.command()
+def ask(
+    question: str = typer.Argument(..., help="A question to ask the replica."),
+    archive: Path = typer.Option(Path("."), "--archive", "-a", help="Archive root."),
+):
+    """Ask the replica a question; it answers only from indexed stories, with citations."""
+    vault = Vault.open(archive)
+    config = vault.load_config()
+    settings = llm_mod.LLMSettings.from_env()
+    try:
+        result = llm_mod.ask(
+            settings,
+            vault.root,
+            vault.index_db_path,
+            question,
+            replica_sunset=config.replica_sunset,
+        )
+    except llm_mod.LLMError as e:
+        _err(str(e))
+        return
+    typer.echo(result.answer)
+    if result.cited_story_ids:
+        typer.echo(f"\nSources: {', '.join(result.cited_story_ids)}")
 
 
 @app.command()
