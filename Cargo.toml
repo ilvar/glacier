@@ -32,6 +32,9 @@ tiny_http = "0.12"
 ureq = "3"
 # Scratch directories for sealing; never part of the archive itself.
 tempfile = "3"
+# Terminal UI. crossterm is used through ratatui's re-export so the two
+# can never drift to incompatible versions.
+ratatui = "0.30"
 
 [dev-dependencies]
 proptest = { version = "=1.11.0", default-features = false, features = ["std"] }

@@ -61,6 +61,10 @@ COMMANDS
   ask \"question\"
       Ask the replica. Answers only from stored stories, with citations.
 
+  tui
+      Browse and add stories in a full-screen terminal interface.
+      Records audio with ctrl-r while adding a story.
+
   serve [--host H] [--port N]
       Run the REST API. Binds to 127.0.0.1 by default.
 
@@ -121,6 +125,7 @@ pub fn run(argv: &[String]) -> i32 {
         Some("tag") => cmd_tag(&args),
         Some("ask") => cmd_ask(&args),
         Some("serve") => cmd_serve(&args),
+        Some("tui") => cmd_tui(&args),
         Some(other) => Err(misuse(&format!(
             "unknown command {other:?}. Run `legacy --help`."
         ))),
@@ -819,6 +824,12 @@ fn cmd_ask(args: &Args) -> Result<Outcome, Failure> {
         let _ = writeln!(out, "\nSources: {}", answer.cited_story_ids.join(", "));
     }
     Ok(Outcome::ok(out))
+}
+
+fn cmd_tui(args: &Args) -> Result<Outcome, Failure> {
+    let vault = open_vault(args)?;
+    crate::tui::run(vault).map_err(failed)?;
+    Ok(Outcome::ok(String::new()))
 }
 
 fn cmd_serve(args: &Args) -> Result<Outcome, Failure> {

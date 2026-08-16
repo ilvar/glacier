@@ -66,12 +66,17 @@ impl VoiceSettings {
     }
 }
 
-/// Record from the default microphone until the operator presses Enter.
+/// Begin recording from the default microphone. Returns a handle the
+/// caller stops later with [`finish_recording`].
+///
+/// Split from stopping so a caller with its own event loop — the TUI —
+/// can keep drawing while the take runs. A blocking record-then-return
+/// call would have to own the keyboard, which the TUI cannot give up.
 ///
 /// The input device spelling is platform-dependent (`alsa` on Linux,
 /// `avfoundation` on macOS, `dshow` on Windows), so
 /// `LEGACY_FFMPEG_AUDIO_INPUT` overrides the `format:device` pair.
-pub fn record_to_wav(out_path: &Path) -> Result<(), VoiceError> {
+pub fn start_recording(out_path: &Path) -> Result<cap::process::Recording, VoiceError> {
     if !cap::process::which("ffmpeg") {
         return Err(VoiceError(
             "ffmpeg is required to record audio and was not found on PATH.".to_owned(),
@@ -90,14 +95,15 @@ pub fn record_to_wav(out_path: &Path) -> Result<(), VoiceError> {
         })?;
     }
 
-    let recording =
-        cap::process::spawn_quiet("ffmpeg", &["-y", "-f", format, "-i", device, out_text])
-            .map_err(|error| VoiceError(format!("failed to start ffmpeg: {error}")))?;
+    cap::process::spawn_quiet("ffmpeg", &["-y", "-f", format, "-i", device, out_text])
+        .map_err(|error| VoiceError(format!("failed to start ffmpeg: {error}")))
+}
 
-    // Block until the operator ends the take.
-    let mut discard = String::new();
-    let _ignored = std::io::stdin().read_line(&mut discard);
-
+/// Stop a take and confirm a file landed on disk.
+pub fn finish_recording(
+    recording: cap::process::Recording,
+    out_path: &Path,
+) -> Result<(), VoiceError> {
     // `q` is ffmpeg's graceful stop, which finalizes the WAV header.
     recording
         .stop(b"q")
@@ -109,6 +115,17 @@ pub fn record_to_wav(out_path: &Path) -> Result<(), VoiceError> {
         ));
     }
     Ok(())
+}
+
+/// Record until the operator presses Enter. Used by the line-oriented
+/// CLI, which owns stdin for the duration.
+pub fn record_to_wav(out_path: &Path) -> Result<(), VoiceError> {
+    let recording = start_recording(out_path)?;
+
+    let mut discard = String::new();
+    let _ignored = std::io::stdin().read_line(&mut discard);
+
+    finish_recording(recording, out_path)
 }
 
 /// A multipart body for the transcription endpoint.
