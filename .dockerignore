@@ -1,7 +1,6 @@
 .git
 .github
 target
-Dockerfile*
 README.md
 AGENTS.md
 CLAUDE.md
