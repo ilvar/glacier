@@ -1,0 +1,6 @@
+apiVersion: v2
+name: glacier
+description: Helm chart for the Glacier/legacy local life-story vault web API
+type: application
+version: 0.1.0
+appVersion: "latest"

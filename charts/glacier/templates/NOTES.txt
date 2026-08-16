@@ -1,0 +1,11 @@
+Glacier is running as {{ include "glacier.fullname" . }}.
+
+To access it without enabling ingress:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "glacier.fullname" . }} 8000:{{ .Values.service.port }}
+
+Then open http://127.0.0.1:8000/.
+
+For a locally loaded image (kind/k3d), override for example:
+
+  --set image.repository=glacier --set image.tag=dev --set image.pullPolicy=Never

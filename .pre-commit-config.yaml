@@ -1,0 +1,53 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ensure-version-bump
+        name: ensure version bump
+        entry: ./scripts/bump-version.sh auto
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: version-sync
+        name: check Cargo version sync
+        entry: ./scripts/check-version.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --all --check
+        language: system
+        pass_filenames: false
+        types_or: [rust, toml]
+
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
+        pass_filenames: false
+        types_or: [rust, toml]
+
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test --all-targets --all-features
+        language: system
+        pass_filenames: false
+        types_or: [rust, toml]
+
+      - id: strictrs
+        name: strictrs check
+        entry: strictrs check .
+        language: system
+        pass_filenames: false
+        types_or: [rust, toml]
+
+      - id: bump-version
+        name: bump patch version
+        entry: ./scripts/bump-version.sh patch
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [manual]
