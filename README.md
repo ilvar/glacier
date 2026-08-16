@@ -87,6 +87,26 @@ legacy seal --archive ./my-archive
 legacy unseal --archive ./my-archive --share "..." --share "..."
 ```
 
+## Terminal browser
+
+```bash
+legacy tui --archive ./my-archive
+```
+
+A full-screen view for browsing stories, interviews, and media, and for
+adding new stories without leaving the terminal. `j`/`k` or the arrow keys
+move, `tab` switches between the three lists, `/` filters, and `a` opens
+the add-story form. Voice mode records with `ctrl-r`: the take is
+ingested into `media/` and archived *before* transcription is attempted,
+so a failed or unconfigured transcription never loses the recording.
+
+<p>
+  <img src="docs/screenshots/tui-browse.png" width="49%" alt="Browsing stories in the legacy TUI, with the detail pane showing tags, people, and places">
+  <img src="docs/screenshots/tui-add.png" width="49%" alt="Adding a new story in the legacy TUI, with an attached voice recording">
+</p>
+
+(Sample data shown above — a demo archive, not a real one.)
+
 ## Archive format
 
 ```

@@ -14,9 +14,12 @@ use crate::core::yaml::{self, Emitter};
 
 pub const VISIBILITIES: [&str; 3] = ["public", "family", "executor-only"];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Visibility {
     Public,
+    /// The default for a new story: most of a life is family material,
+    /// and widening it later is a deliberate act.
+    #[default]
     Family,
     ExecutorOnly,
 }
