@@ -10,6 +10,15 @@
 
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
+
+    if argv
+        .iter()
+        .any(|argument| argument == "--version" || argument == "-V")
+    {
+        println!("legacy {}", env!("CARGO_PKG_VERSION"));
+        legacy::cap::process::exit(0);
+    }
+
     let code = legacy::cli::run(&argv);
     legacy::cap::process::exit(code);
 }

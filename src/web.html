@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>legacy</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f1ea;
+      --panel: #fffdf7;
+      --text: #25241f;
+      --muted: #716f65;
+      --line: #d9d5c8;
+      --accent: #375b45;
+      --accent-2: #284335;
+      --danger: #9b3b32;
+      --code: #ebe7da;
+      --shadow: 0 12px 36px rgba(36, 32, 22, .08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #171914;
+        --panel: #20231d;
+        --text: #ecebdd;
+        --muted: #aaa99b;
+        --line: #3a3d34;
+        --accent: #88b596;
+        --accent-2: #a4c8ae;
+        --danger: #ef8c82;
+        --code: #292d25;
+        --shadow: 0 12px 36px rgba(0, 0, 0, .22);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .bar, main { width: min(1180px, calc(100% - 28px)); margin: 0 auto; }
+    .bar { display: flex; gap: 14px; align-items: center; min-height: 68px; }
+    .brand { font-weight: 780; letter-spacing: -.03em; font-size: 21px; white-space: nowrap; }
+    .brand small { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0; margin-left: 7px; }
+    .archive-box { display: flex; gap: 8px; flex: 1; min-width: 0; }
+    main { padding: 26px 0 64px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .span-12 { grid-column: span 12; }
+    .span-8 { grid-column: span 8; }
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+    h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
+    h2 { font-size: 17px; margin-bottom: 4px; }
+    h3 { font-size: 15px; }
+    p { margin: 6px 0 14px; }
+    .muted { color: var(--muted); }
+    .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .row > * { flex: 1 1 150px; }
+    .row > button, .row > .buttonish { flex: 0 0 auto; }
+    label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
+    input, textarea, select, button {
+      font: inherit;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+    }
+    input, textarea, select { width: 100%; background: var(--bg); padding: 9px 10px; }
+    textarea { min-height: 100px; resize: vertical; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+      padding: 9px 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    @media (prefers-color-scheme: dark) { button { color: #102017; } }
+    button:hover { background: var(--accent-2); }
+    button.secondary { color: var(--text); background: transparent; border-color: var(--line); }
+    button.danger { background: var(--danger); color: #fff; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .check { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 14px; font-weight: 500; }
+    .check input { width: auto; }
+    pre {
+      margin: 12px 0 0;
+      padding: 12px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--code);
+      border-radius: 9px;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .stories { display: grid; gap: 10px; margin-top: 14px; }
+    .story { border-top: 1px solid var(--line); padding-top: 12px; }
+    .story:first-child { border-top: 0; padding-top: 0; }
+    .story-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .story-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .story-body { white-space: pre-wrap; margin: 7px 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .chip { background: var(--code); border-radius: 999px; padding: 3px 7px; font-size: 11px; color: var(--muted); }
+    .question { font-size: 19px; line-height: 1.35; margin: 12px 0; }
+    .notice { border-left: 3px solid var(--accent); padding-left: 12px; }
+    .notice.danger { border-color: var(--danger); }
+    .status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .hidden { display: none !important; }
+    @media (max-width: 820px) {
+      .span-8, .span-6, .span-4 { grid-column: span 12; }
+      .bar { align-items: stretch; flex-direction: column; padding: 12px 0; }
+      .archive-box { width: 100%; }
+      .status { display: none; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">legacy <small>local life-story vault</small></div>
+    <div class="archive-box">
+      <input id="archive" aria-label="Archive path" placeholder="Archive path, e.g. /home/me/my-archive">
+      <button id="load" type="button">Load</button>
+    </div>
+    <div class="status" id="status">local API</div>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card span-8">
+      <h2>Stories</h2>
+      <p class="muted">Browse the current archive. Filters are optional.</p>
+      <div class="row">
+        <label>Year<input id="filter-year" inputmode="numeric" placeholder="1994"></label>
+        <label>Person<input id="filter-person" placeholder="mary-oconnor"></label>
+        <label>Tag<input id="filter-tag" placeholder="school"></label>
+        <button id="refresh-stories" class="secondary" type="button">Refresh</button>
+      </div>
+      <div class="stories" id="stories"><span class="muted">Choose an archive path and load it.</span></div>
+    </section>
+
+    <section class="card span-4">
+      <h2>New archive</h2>
+      <p class="muted">Creates a plain-file archive on this machine.</p>
+      <form id="init-form">
+        <label>Path<input name="path" required placeholder="/home/me/my-archive"></label><br>
+        <label>Subject<input name="subject" required placeholder="Jane Doe"></label><br>
+        <div class="row">
+          <label>Threshold<input name="threshold" type="number" min="1" value="3"></label>
+          <label>Shares<input name="shares" type="number" min="1" value="5"></label>
+        </div><br>
+        <button type="submit">Create archive</button>
+      </form>
+      <pre id="init-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-6">
+      <h2>Add a story</h2>
+      <p class="muted">Saved immediately as Markdown in the archive.</p>
+      <form id="story-form">
+        <div class="row">
+          <label>Title<input name="title" required></label>
+          <label>Date<input name="date" placeholder="YYYY-MM-DD, YYYY-MM, YYYY, YYYYs"></label>
+          <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
+        </div><br>
+        <label>Story<textarea name="body" placeholder="What happened?"></textarea></label><br>
+        <div class="row">
+          <label>People<input name="people" placeholder="comma,separated"></label>
+          <label>Places<input name="places" placeholder="comma,separated"></label>
+          <label>Tags<input name="tags" placeholder="comma,separated"></label>
+        </div><br>
+        <button type="submit">Save story</button>
+      </form>
+      <pre id="story-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-6">
+      <h2>Ask the replica</h2>
+      <p class="muted">Uses the configured OpenAI-compatible endpoint and only answers from stored stories.</p>
+      <form id="ask-form">
+        <label>Question<textarea name="question" required placeholder="What did you do after school?"></textarea></label><br>
+        <button type="submit">Ask</button>
+      </form>
+      <pre id="ask-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-8">
+      <h2>Interview</h2>
+      <p class="muted">Text interviews are resumable; every answer is stored as a story before the session advances.</p>
+      <div class="row">
+        <label>Question bank<select id="bank"><option>Loading banks…</option></select></label>
+        <button id="start-interview" type="button">Start</button>
+        <label>Resume session<input id="resume-id" placeholder="session id"></label>
+        <button id="resume-interview" class="secondary" type="button">Resume</button>
+      </div>
+      <div id="interview-active" class="hidden">
+        <p class="muted" id="interview-meta"></p>
+        <div class="question" id="interview-question"></div>
+        <div class="chips" id="interview-followups"></div><br>
+        <label>Answer<textarea id="interview-answer"></textarea></label><br>
+        <div class="row">
+          <label>Visibility<select id="interview-visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
+          <button id="answer-interview" type="button">Save answer</button>
+          <button id="skip-interview" class="secondary" type="button">Skip</button>
+        </div>
+      </div>
+      <pre id="interview-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-4">
+      <h2>Media ingest</h2>
+      <p class="muted">Copies recognized files from a local directory; originals are not modified.</p>
+      <form id="media-form">
+        <label>Source directory<input name="source" required></label><br>
+        <div class="row">
+          <label>Date<input name="date" placeholder="optional"></label>
+          <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
+        </div><br>
+        <label class="check"><input name="date_from_exif" type="checkbox"> Try capture date via ffprobe</label><br>
+        <button type="submit">Ingest media</button>
+      </form>
+      <pre id="media-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-6">
+      <h2>Maintenance</h2>
+      <p class="muted">Derived state is rebuildable. Verification checks the manifest against disk.</p>
+      <div class="row">
+        <button id="verify" type="button">Verify</button>
+        <button id="build" class="secondary" type="button">Rebuild timeline + index</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+      <p class="muted">LLM tag suggestions are a preview unless you explicitly apply them.</p>
+      <div class="row">
+        <button id="tag-preview" class="secondary" type="button">Preview tags</button>
+        <button id="tag-apply" type="button">Apply suggested tags</button>
+      </div>
+      <pre id="maintenance-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-6">
+      <h2>Seal</h2>
+      <p class="notice danger"><strong>Shares are shown once.</strong> Copy and distribute them before leaving or refreshing this page. The archive does not retain them.</p>
+      <div class="row">
+        <label class="check"><input id="tier-family" type="checkbox" checked> family</label>
+        <label class="check"><input id="tier-executor" type="checkbox" checked> executor-only</label>
+        <label class="check"><input id="plaintext-escrow" type="checkbox"> plaintext family escrow</label>
+        <button id="seal" class="danger" type="button">Seal selected tiers</button>
+      </div>
+      <pre id="seal-result" class="hidden"></pre>
+    </section>
+
+    <section class="card span-12">
+      <h2>Unseal</h2>
+      <p class="muted">Paste enough SLIP-0039 shares for one tier, one complete share per line.</p>
+      <form id="unseal-form">
+        <div class="row">
+          <label style="flex:3 1 420px">Shares<textarea name="shares" required></textarea></label>
+          <label>Output directory<input name="output" placeholder="optional; defaults inside archive"></label>
+          <button type="submit">Unseal</button>
+        </div>
+      </form>
+      <pre id="unseal-result" class="hidden"></pre>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const archiveInput = $('archive');
+  let sessionId = null;
+
+  archiveInput.value = localStorage.getItem('legacy.archive') || '';
+
+  function archive() {
+    const value = archiveInput.value.trim();
+    if (!value) throw new Error('Set an archive path first.');
+    localStorage.setItem('legacy.archive', value);
+    return value;
+  }
+
+  function csv(value) {
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  function lines(value) {
+    return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  }
+
+  function setBusy(button, busy) {
+    if (!button) return;
+    button.disabled = busy;
+  }
+
+  function show(id, value) {
+    const el = $(id);
+    el.classList.remove('hidden');
+    el.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  }
+
+  function fail(id, error) {
+    show(id, `Error: ${error.message}`);
+    $('status').textContent = 'request failed';
+  }
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: options.body ? { 'Content-Type': 'application/json', ...(options.headers || {}) } : options.headers
+    });
+    let data;
+    try {
+      data = await response.json();
+    } catch (_) {
+      throw new Error(`HTTP ${response.status}: invalid JSON response`);
+    }
+    if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+    $('status').textContent = 'connected';
+    return data;
+  }
+
+  async function action(button, resultId, fn) {
+    setBusy(button, true);
+    try { return await fn(); }
+    catch (error) { fail(resultId, error); return null; }
+    finally { setBusy(button, false); }
+  }
+
+  function addChip(parent, text) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = text;
+    parent.appendChild(chip);
+  }
+
+  function renderStories(stories) {
+    const root = $('stories');
+    root.replaceChildren();
+    if (!stories.length) {
+      const empty = document.createElement('span');
+      empty.className = 'muted';
+      empty.textContent = 'No stories matched.';
+      root.appendChild(empty);
+      return;
+    }
+    for (const story of stories) {
+      const item = document.createElement('article');
+      item.className = 'story';
+      const head = document.createElement('div');
+      head.className = 'story-head';
+      const title = document.createElement('h3');
+      title.textContent = story.title;
+      const date = document.createElement('span');
+      date.className = 'story-date';
+      date.textContent = story.date || 'undated';
+      head.append(title, date);
+      const body = document.createElement('div');
+      body.className = 'story-body';
+      body.textContent = story.body || '';
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      addChip(chips, story.visibility);
+      for (const tag of story.tags || []) addChip(chips, `#${tag}`);
+      item.append(head, body, chips);
+      root.appendChild(item);
+    }
+  }
+
+  async function loadStories() {
+    const params = new URLSearchParams({ archive: archive() });
+    const year = $('filter-year').value.trim();
+    const person = $('filter-person').value.trim();
+    const tag = $('filter-tag').value.trim();
+    if (year) params.set('year', year);
+    if (person) params.set('person', person);
+    if (tag) params.set('tag', tag);
+    const stories = await api(`/stories?${params.toString()}`);
+    renderStories(stories);
+  }
+
+  async function loadBanks() {
+    try {
+      const banks = await api('/banks');
+      const select = $('bank');
+      select.replaceChildren();
+      for (const bank of banks) {
+        const option = document.createElement('option');
+        option.value = bank.name;
+        option.textContent = `${bank.name} — ${bank.description} (${bank.question_count})`;
+        select.appendChild(option);
+      }
+    } catch (error) {
+      fail('interview-result', error);
+    }
+  }
+
+  function renderInterview(session) {
+    sessionId = session.session_id;
+    $('resume-id').value = sessionId;
+    $('interview-active').classList.remove('hidden');
+    $('interview-meta').textContent = `${session.bank} · ${session.status} · ${session.answered.length} answered · ${session.skipped.length} skipped · ${sessionId}`;
+    $('interview-followups').replaceChildren();
+    $('interview-answer').value = '';
+    if (!session.next_question) {
+      $('interview-question').textContent = 'Interview complete.';
+      $('answer-interview').disabled = true;
+      $('skip-interview').disabled = true;
+      return;
+    }
+    $('answer-interview').disabled = false;
+    $('skip-interview').disabled = false;
+    $('interview-question').textContent = session.next_question.prompt;
+    for (const followup of session.next_question.followups || []) addChip($('interview-followups'), followup);
+  }
+
+  $('load').addEventListener('click', () => action($('load'), 'maintenance-result', async () => {
+    await loadStories();
+    await loadBanks();
+  }));
+  $('refresh-stories').addEventListener('click', () => action($('refresh-stories'), 'maintenance-result', loadStories));
+
+  $('init-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const button = event.submitter;
+    action(button, 'init-result', async () => {
+      const form = new FormData(event.currentTarget);
+      const body = {
+        path: String(form.get('path')).trim(),
+        subject: String(form.get('subject')).trim(),
+        threshold: Number(form.get('threshold')),
+        shares: Number(form.get('shares'))
+      };
+      const result = await api('/init', { method: 'POST', body: JSON.stringify(body) });
+      archiveInput.value = result.root;
+      localStorage.setItem('legacy.archive', result.root);
+      show('init-result', result);
+      await loadStories();
+    });
+  });
+
+  $('story-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const button = event.submitter;
+    action(button, 'story-result', async () => {
+      const form = new FormData(event.currentTarget);
+      const body = {
+        archive: archive(),
+        title: String(form.get('title')).trim(),
+        date: String(form.get('date')).trim() || null,
+        body: String(form.get('body')),
+        people: csv(String(form.get('people'))),
+        places: csv(String(form.get('places'))),
+        tags: csv(String(form.get('tags'))),
+        visibility: String(form.get('visibility'))
+      };
+      const result = await api('/stories', { method: 'POST', body: JSON.stringify(body) });
+      show('story-result', result);
+      event.currentTarget.reset();
+      await loadStories();
+    });
+  });
+
+  $('ask-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    action(event.submitter, 'ask-result', async () => {
+      const form = new FormData(event.currentTarget);
+      const result = await api('/ask', { method: 'POST', body: JSON.stringify({ archive: archive(), question: String(form.get('question')).trim() }) });
+      show('ask-result', `Answer:\n${result.answer}\n\nCited stories:\n${(result.cited_story_ids || []).join('\n')}`);
+    });
+  });
+
+  $('start-interview').addEventListener('click', () => action($('start-interview'), 'interview-result', async () => {
+    const result = await api('/interviews', { method: 'POST', body: JSON.stringify({ archive: archive(), bank: $('bank').value }) });
+    renderInterview(result);
+    show('interview-result', result);
+  }));
+
+  $('resume-interview').addEventListener('click', () => action($('resume-interview'), 'interview-result', async () => {
+    const id = $('resume-id').value.trim();
+    if (!id) throw new Error('Enter a session id.');
+    const result = await api(`/interviews/${encodeURIComponent(id)}?archive=${encodeURIComponent(archive())}`);
+    renderInterview(result);
+    show('interview-result', result);
+  }));
+
+  $('answer-interview').addEventListener('click', () => action($('answer-interview'), 'interview-result', async () => {
+    if (!sessionId) throw new Error('Start or resume an interview first.');
+    const answer = $('interview-answer').value.trim();
+    if (!answer) throw new Error('Enter an answer.');
+    const result = await api(`/interviews/${encodeURIComponent(sessionId)}/answer`, { method: 'POST', body: JSON.stringify({ archive: archive(), answer, visibility: $('interview-visibility').value }) });
+    renderInterview(result);
+    show('interview-result', result);
+    await loadStories();
+  }));
+
+  $('skip-interview').addEventListener('click', () => action($('skip-interview'), 'interview-result', async () => {
+    if (!sessionId) throw new Error('Start or resume an interview first.');
+    const result = await api(`/interviews/${encodeURIComponent(sessionId)}/skip`, { method: 'POST', body: JSON.stringify({ archive: archive() }) });
+    renderInterview(result);
+    show('interview-result', result);
+  }));
+
+  $('media-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    action(event.submitter, 'media-result', async () => {
+      const form = new FormData(event.currentTarget);
+      const body = {
+        archive: archive(),
+        source: String(form.get('source')).trim(),
+        date: String(form.get('date')).trim() || null,
+        visibility: String(form.get('visibility')),
+        date_from_exif: form.get('date_from_exif') === 'on'
+      };
+      const result = await api('/media/ingest', { method: 'POST', body: JSON.stringify(body) });
+      show('media-result', result);
+    });
+  });
+
+  $('verify').addEventListener('click', () => action($('verify'), 'maintenance-result', async () => {
+    const result = await api(`/verify?archive=${encodeURIComponent(archive())}`);
+    show('maintenance-result', result);
+  }));
+
+  $('build').addEventListener('click', () => action($('build'), 'maintenance-result', async () => {
+    const result = await api('/timeline/build', { method: 'POST', body: JSON.stringify({ archive: archive() }) });
+    show('maintenance-result', result);
+  }));
+
+  async function tags(apply) {
+    const result = await api('/tag', { method: 'POST', body: JSON.stringify({ archive: archive(), apply }) });
+    show('maintenance-result', result);
+    if (apply) await loadStories();
+  }
+  $('tag-preview').addEventListener('click', () => action($('tag-preview'), 'maintenance-result', () => tags(false)));
+  $('tag-apply').addEventListener('click', () => action($('tag-apply'), 'maintenance-result', () => tags(true)));
+
+  $('seal').addEventListener('click', () => action($('seal'), 'seal-result', async () => {
+    const tiers = [];
+    if ($('tier-family').checked) tiers.push('family');
+    if ($('tier-executor').checked) tiers.push('executor-only');
+    if (!tiers.length) throw new Error('Select at least one tier.');
+    if (!confirm(`Seal ${tiers.join(' and ')} now? Newly generated shares must be copied before this page is closed.`)) return;
+    const result = await api('/seal', { method: 'POST', body: JSON.stringify({ archive: archive(), tiers, plaintext_escrow: $('plaintext-escrow').checked }) });
+    show('seal-result', result);
+  }));
+
+  $('unseal-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    action(event.submitter, 'unseal-result', async () => {
+      const form = new FormData(event.currentTarget);
+      const body = { archive: archive(), shares: lines(String(form.get('shares'))) };
+      const output = String(form.get('output')).trim();
+      if (output) body.output = output;
+      const result = await api('/unseal', { method: 'POST', body: JSON.stringify(body) });
+      show('unseal-result', result);
+    });
+  });
+
+  loadBanks();
+  if (archiveInput.value) {
+    loadStories().catch((error) => fail('maintenance-result', error));
+  }
+})();
+</script>
+</body>
+</html>

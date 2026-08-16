@@ -55,11 +55,24 @@ pub fn serve(host: &str, port: u16) -> Result<(), String> {
     }
 
     for mut request in listener.server.incoming_requests() {
-        let mut body = String::new();
-        let _ignored = std::io::Read::read_to_string(request.as_reader(), &mut body);
-
         let method = request.method().as_str().to_owned();
         let url = request.url().to_owned();
+        let (path, _query) = split_url(&url);
+
+        if method == "GET" && path == "/" {
+            let mut response = tiny_http::Response::from_string(include_str!("web.html"));
+            if let Ok(header) = tiny_http::Header::from_bytes(
+                &b"Content-Type"[..],
+                &b"text/html; charset=utf-8"[..],
+            ) {
+                response.add_header(header);
+            }
+            let _ignored = request.respond(response);
+            continue;
+        }
+
+        let mut body = String::new();
+        let _ignored = std::io::Read::read_to_string(request.as_reader(), &mut body);
         let reply = route(&method, &url, &body);
 
         let mut response =

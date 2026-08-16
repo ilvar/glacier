@@ -55,8 +55,9 @@ works around it with a local `type Unit = ();` alias in `app.rs` and
   `interview`, `crypto`/`seal` (age + SLIP-0039), `llm`/`voice`
   (opt-in, network-gated), `env` (the `LEGACY_*`-preferred /
   `OPENAI_*`-fallback env var lookup), `dates`, `yaml`, `clock`.
-- `src/cli.rs` and `src/api.rs` — two thin front ends over the same
-  `core` functions (CLI verbs and a localhost-only REST API).
+- `src/cli.rs` and `src/api.rs` — thin front ends over the same `core`
+  functions (CLI verbs and a localhost-only REST API). `src/web.html` is
+  embedded into API mode and served from `/`.
 - `src/tui/` — the `legacy tui` ratatui browser, split into `app.rs`
   (state and transitions, no terminal, fully unit-testable),
   `render.rs` (drawing, testable via `ratatui::backend::TestBackend`),
@@ -64,18 +65,41 @@ works around it with a local `type Unit = ();` alias in `app.rs` and
   TTY — keep this file small).
 - `src/args.rs` — hand-rolled argument parsing (no external CLI-parsing
   crate).
+- `Dockerfile` — multi-stage production image; API mode is the default
+  container command and `/data` is the archive volume.
+- `charts/glacier/` — Helm chart for the web/API deployment.
 
 ## Working loop
+
+Install the local commit hooks once:
+
+```bash
+pre-commit install
+```
+
+For a normal change, prefer the repository commit helper:
+
+```bash
+./commit.sh "Explain why this change exists"
+```
+
+It performs the automatic version bump, runs the complete pre-commit suite,
+stages the checked tree, and creates the commit. Direct `git commit` is still
+supported; if the version has not already changed, the hook bumps it and the
+first attempt will stop so `Cargo.toml`/`Cargo.lock` can be staged before
+retrying.
+
+The underlying checks are:
 
 ```bash
 cargo build
 cargo test
 cargo fmt --all
 cargo clippy --all-targets --all-features -- -D warnings
-strictrs check .          # requires: cargo install --git https://github.com/ilvar/strictrs
+strictrs check .
 ```
 
-All five must be clean before pushing. `strictrs check .` should print
+All must be clean before pushing. `strictrs check .` should print
 `{"ok": true, "error_count": 0}`. The Rust toolchain is pinned to 1.97.1
 via `rust-toolchain.toml`; don't bump it casually.
 
@@ -83,6 +107,44 @@ Optional external tools used at runtime (never at build time): `age` and
 `age-keygen` for encryption, `par2` for sealed-archive recovery data,
 `ffmpeg`/`ffprobe` for media metadata and voice recording. All of them are
 optional — missing-tool errors must stay actionable, not a panic.
+
+## Versioning and releases
+
+`package.version` in `Cargo.toml` is the single source of truth and the binary
+must report it through `legacy --version`. Use Semantic Versioning.
+
+Every commit changes the application version. The default automatic change is
+a patch bump. For a feature or breaking change, run one of these before the
+commit:
+
+```bash
+./scripts/bump-version.sh minor
+./scripts/bump-version.sh major
+```
+
+The automatic hook detects that the version already differs from `HEAD` and
+will not add another patch bump. `Cargo.lock` must always contain the same
+root-package version; `scripts/check-version.sh` enforces this.
+
+Every push to `main` is an automatic release (normally a merged PR). The
+Container/Helm/Release workflow requires the Cargo version to be new, publishes
+the versioned image and Helm chart, then creates matching tag `vX.Y.Z` and a
+GitHub Release with generated notes. Do not manually create routine release tags,
+and do not introduce a second version source in Helm, Docker, build scripts, or
+git metadata. See `docs/releasing.md` for details.
+
+## Containers and Helm
+
+`.github/workflows/container.yml` validates the chart and builds the Docker
+image on pull requests. Every push to `main` publishes multi-architecture
+`linux/amd64` + `linux/arm64` images to `ghcr.io/ilvar/glacier` with `latest`,
+`X.Y.Z`, `X.Y`, and commit-SHA tags. It also publishes an OCI Helm chart under
+`ghcr.io/ilvar/charts/glacier`, then creates the corresponding GitHub release.
+
+The chart defaults to the published GHCR image. For local kind/k3d development,
+override `image.repository`, `image.tag`, and set `image.pullPolicy=Never` after
+loading the image into the cluster. Keep ingress disabled by default because API
+mode has no authentication.
 
 ## CI
 
@@ -93,11 +155,17 @@ x86_64). A test that hardcodes a path as a string (e.g. comparing against
 `"timeline/2001/..."`) will fail on Windows, where `PathBuf::display()`
 uses `\` — build expectations with `Path::join` instead.
 
+`.github/workflows/container.yml` additionally validates that a main release uses
+a fresh Cargo version, lints/renders the Helm chart, builds the multi-architecture
+image, publishes the image/chart, and creates the matching GitHub Release.
+
 ## Repository conventions
 
 - Primary development branch is `main`.
 - Commit messages explain *why*, not what — the diff already shows what
   changed.
+- Prefer `./commit.sh` so the patch version bump and pre-commit checks happen
+  consistently.
 - Don't add features, error handling, or abstractions beyond what a task
   requires; this codebase favors a few duplicated lines over a premature
   helper.
