@@ -766,6 +766,7 @@ mod tests {
     use crate::cap;
     use crate::core::story::{new_story, save_story, NewStory, Visibility};
     use crate::core::vault::Vault;
+    use std::path::Path;
 
     fn seeded() -> (tempfile::TempDir, App) {
         let temp = tempfile::TempDir::new().expect("temp dir");
@@ -941,7 +942,12 @@ mod tests {
         }
 
         let written = app.save_draft().expect("saves");
-        assert_eq!(written, "timeline/2001/2001-05-04-a-new-story.md");
+        // save_draft renders the path with the platform's own separator,
+        // since it is shown to the operator verbatim in the status line.
+        let expected = Path::new("timeline")
+            .join("2001")
+            .join("2001-05-04-a-new-story.md");
+        assert_eq!(written, expected.display().to_string());
         assert_eq!(app.mode, Mode::Browse);
 
         let saved = app
