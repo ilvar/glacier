@@ -75,6 +75,10 @@
     .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
     .row > * { flex: 1 1 150px; }
     .row > button, .row > .buttonish { flex: 0 0 auto; }
+    /* Labels whose control holds long text (e.g. the bank picker's
+       "name — description" options) need more room than the 150px
+       default before they're worth truncating. */
+    .row > .wide { flex: 3 1 220px; }
     label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
     input, textarea, select, button {
       font: inherit;
@@ -82,7 +86,13 @@
       border: 1px solid var(--line);
       border-radius: 9px;
     }
-    input, textarea, select { width: 100%; background: var(--bg); padding: 9px 10px; }
+    input, textarea, select {
+      width: 100%;
+      background: var(--bg);
+      padding: 9px 10px;
+      /* 16px avoids iOS Safari auto-zooming the page on focus. */
+      font-size: 16px;
+    }
     textarea { min-height: 100px; resize: vertical; }
     button {
       background: var(--accent);
@@ -205,7 +215,7 @@
       <h2>Interview</h2>
       <p class="muted">Text interviews are resumable; every answer is stored as a story before the session advances.</p>
       <div class="row">
-        <label>Question bank<select id="bank"><option>Loading banks…</option></select></label>
+        <label class="wide">Question bank<select id="bank"><option>Loading banks…</option></select></label>
         <button id="start-interview" type="button">Start</button>
         <label>Resume session<input id="resume-id" placeholder="session id"></label>
         <button id="resume-interview" class="secondary" type="button">Resume</button>
