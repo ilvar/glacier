@@ -45,20 +45,60 @@
       top: 0;
       z-index: 5;
       border-bottom: 1px solid var(--line);
-      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
       backdrop-filter: blur(12px);
     }
-    .bar, main { width: min(1180px, calc(100% - 28px)); margin: 0 auto; }
-    .bar { display: flex; gap: 14px; align-items: center; min-height: 68px; }
-    .brand { font-weight: 780; letter-spacing: -.03em; font-size: 21px; white-space: nowrap; }
-    .brand small { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0; margin-left: 7px; }
-    .archive-box { display: flex; gap: 8px; flex: 1; min-width: 0; }
-    main { padding: 26px 0 64px; }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
-    .span-12 { grid-column: span 12; }
-    .span-8 { grid-column: span 8; }
-    .span-6 { grid-column: span 6; }
-    .span-4 { grid-column: span 4; }
+    .bar, main { width: min(900px, calc(100% - 24px)); margin: 0 auto; }
+    .bar { display: flex; gap: 10px; align-items: center; min-height: 56px; }
+    .brand { font-weight: 780; letter-spacing: -.03em; font-size: 19px; }
+    .spacer { flex: 1; }
+
+    /* The menu button only exists on narrow screens; the same nav shows
+       as a plain row once there is width for it. */
+    .menu-toggle {
+      display: none;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 7px 10px;
+      font-size: 15px;
+      line-height: 1;
+    }
+    .archive-chip {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      padding: 6px 10px;
+      max-width: 46vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      width: min(900px, calc(100% - 24px));
+      margin: 0 auto;
+      padding-bottom: 8px;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 650;
+      padding: 7px 10px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    nav a:hover { background: var(--code); color: var(--text); }
+    nav a.current { background: var(--accent); color: #fff; }
+    @media (prefers-color-scheme: dark) { nav a.current { color: #102017; } }
+
+    main { padding: 18px 0 64px; }
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -67,8 +107,9 @@
       box-shadow: var(--shadow);
       min-width: 0;
     }
+    .card + .card { margin-top: 14px; }
     h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
-    h2 { font-size: 17px; margin-bottom: 4px; }
+    h2 { font-size: 18px; margin-bottom: 4px; }
     h3 { font-size: 15px; }
     p { margin: 6px 0 14px; }
     .muted { color: var(--muted); }
@@ -80,6 +121,7 @@
        default before they're worth truncating. */
     .row > .wide { flex: 3 1 220px; }
     label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 650; }
+    .field { margin-bottom: 12px; }
     input, textarea, select, button {
       font: inherit;
       color: var(--text);
@@ -93,12 +135,12 @@
       /* 16px avoids iOS Safari auto-zooming the page on focus. */
       font-size: 16px;
     }
-    textarea { min-height: 100px; resize: vertical; }
+    textarea { min-height: 120px; resize: vertical; }
     button {
       background: var(--accent);
       color: #fff;
       border-color: transparent;
-      padding: 9px 13px;
+      padding: 10px 14px;
       font-weight: 700;
       cursor: pointer;
     }
@@ -109,6 +151,9 @@
     button:disabled { opacity: .5; cursor: wait; }
     .check { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 14px; font-weight: 500; }
     .check input { width: auto; }
+    details { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 650; }
+    details[open] summary { margin-bottom: 12px; }
     pre {
       margin: 12px 0 0;
       padding: 12px;
@@ -130,166 +175,218 @@
     .question { font-size: 19px; line-height: 1.35; margin: 12px 0; }
     .notice { border-left: 3px solid var(--accent); padding-left: 12px; }
     .notice.danger { border-color: var(--danger); }
-    .status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .banner {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--code);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .banner.bad { color: var(--danger); }
     .hidden { display: none !important; }
-    @media (max-width: 820px) {
-      .span-8, .span-6, .span-4 { grid-column: span 12; }
-      .bar { align-items: stretch; flex-direction: column; padding: 12px 0; }
-      .archive-box { width: 100%; }
-      .status { display: none; }
+
+    @media (max-width: 720px) {
+      .menu-toggle { display: block; }
+      /* Collapsed by default so the primary form is what a phone shows
+         first; the same links stay one tap away behind the button. */
+      nav { display: none; flex-direction: column; flex-wrap: nowrap; padding-bottom: 10px; }
+      nav.open { display: flex; }
+      nav a { padding: 11px 10px; font-size: 15px; }
+      .card { padding: 15px; border-radius: 13px; }
+      main { padding-top: 14px; }
     }
   </style>
 </head>
 <body>
 <header>
   <div class="bar">
-    <div class="brand">legacy <small>local life-story vault</small></div>
-    <div class="archive-box">
-      <input id="archive" aria-label="Archive path" placeholder="Archive path, e.g. /home/me/my-archive">
-      <button id="load" type="button">Load</button>
-    </div>
-    <div class="status" id="status">local API</div>
+    <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="nav" aria-expanded="false">☰ Menu</button>
+    <div class="brand">legacy</div>
+    <div class="spacer"></div>
+    <button class="archive-chip" id="archive-chip" type="button" title="Which archive this is writing to">archive…</button>
   </div>
+  <nav id="nav">
+    <a href="#add" data-view="add">Add a story</a>
+    <a href="#stories" data-view="stories">Stories</a>
+    <a href="#interview" data-view="interview">Interview</a>
+    <a href="#media" data-view="media">Media</a>
+    <a href="#ask" data-view="ask">Ask</a>
+    <a href="#maintenance" data-view="maintenance">Maintenance</a>
+    <a href="#seal" data-view="seal">Seal</a>
+    <a href="#unseal" data-view="unseal">Unseal</a>
+    <a href="#archive" data-view="archive">Archive</a>
+  </nav>
 </header>
 
 <main>
-  <div class="grid">
-    <section class="card span-8">
-      <h2>Stories</h2>
-      <p class="muted">Browse the current archive. Filters are optional.</p>
-      <div class="row">
-        <label>Year<input id="filter-year" inputmode="numeric" placeholder="1994"></label>
-        <label>Person<input id="filter-person" placeholder="mary-oconnor"></label>
-        <label>Tag<input id="filter-tag" placeholder="school"></label>
-        <button id="refresh-stories" class="secondary" type="button">Refresh</button>
-      </div>
-      <div class="stories" id="stories"><span class="muted">Choose an archive path and load it.</span></div>
-    </section>
+  <div class="banner hidden" id="banner"></div>
 
-    <section class="card span-4">
-      <h2>New archive</h2>
-      <p class="muted">Creates a plain-file archive on this machine.</p>
-      <form id="init-form">
-        <label>Path<input name="path" required placeholder="/home/me/my-archive"></label><br>
-        <label>Subject<input name="subject" required placeholder="Jane Doe"></label><br>
+  <!-- The landing view: capturing a story is the thing this tool exists
+       for, so it is what loads with no navigation and no setup. -->
+  <section class="card view" id="view-add">
+    <h2>Add a story</h2>
+    <p class="muted">Saved straight into the archive as Markdown.</p>
+    <form id="story-form">
+      <div class="field"><label>Title<input name="title" required></label></div>
+      <div class="field"><label>Story<textarea name="body" placeholder="What happened?"></textarea></label></div>
+      <div class="field">
         <div class="row">
-          <label>Threshold<input name="threshold" type="number" min="1" value="3"></label>
-          <label>Shares<input name="shares" type="number" min="1" value="5"></label>
-        </div><br>
-        <button type="submit">Create archive</button>
-      </form>
-      <pre id="init-result" class="hidden"></pre>
-    </section>
-
-    <section class="card span-6">
-      <h2>Add a story</h2>
-      <p class="muted">Saved immediately as Markdown in the archive.</p>
-      <form id="story-form">
-        <div class="row">
-          <label>Title<input name="title" required></label>
           <label>Date<input name="date" placeholder="YYYY-MM-DD, YYYY-MM, YYYY, YYYYs"></label>
           <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
-        </div><br>
-        <label>Story<textarea name="body" placeholder="What happened?"></textarea></label><br>
+        </div>
+      </div>
+      <details>
+        <summary>People, places, tags</summary>
         <div class="row">
           <label>People<input name="people" placeholder="comma,separated"></label>
           <label>Places<input name="places" placeholder="comma,separated"></label>
           <label>Tags<input name="tags" placeholder="comma,separated"></label>
-        </div><br>
-        <button type="submit">Save story</button>
-      </form>
-      <pre id="story-result" class="hidden"></pre>
-    </section>
+        </div>
+      </details>
+      <p></p>
+      <button type="submit">Save story</button>
+    </form>
+    <pre id="story-result" class="hidden"></pre>
+  </section>
 
-    <section class="card span-6">
-      <h2>Ask the replica</h2>
-      <p class="muted">Uses the configured OpenAI-compatible endpoint and only answers from stored stories.</p>
-      <form id="ask-form">
-        <label>Question<textarea name="question" required placeholder="What did you do after school?"></textarea></label><br>
-        <button type="submit">Ask</button>
-      </form>
-      <pre id="ask-result" class="hidden"></pre>
-    </section>
+  <section class="card view hidden" id="view-stories">
+    <h2>Stories</h2>
+    <p class="muted">Everything in the archive. Filters are optional.</p>
+    <div class="row">
+      <label>Year<input id="filter-year" inputmode="numeric" placeholder="1994"></label>
+      <label>Person<input id="filter-person" placeholder="mary-oconnor"></label>
+      <label>Tag<input id="filter-tag" placeholder="school"></label>
+      <button id="refresh-stories" class="secondary" type="button">Refresh</button>
+    </div>
+    <div class="stories" id="stories"><span class="muted">Loading…</span></div>
+  </section>
 
-    <section class="card span-8">
-      <h2>Interview</h2>
-      <p class="muted">Text interviews are resumable; every answer is stored as a story before the session advances.</p>
+  <section class="card view hidden" id="view-interview">
+    <h2>Interview</h2>
+    <p class="muted">Resumable; every answer is stored as a story before the session advances.</p>
+    <div class="row">
+      <label class="wide">Question bank<select id="bank"><option>Loading banks…</option></select></label>
+      <button id="start-interview" type="button">Start</button>
+    </div>
+    <div id="interview-active" class="hidden">
+      <p class="muted" id="interview-meta"></p>
+      <div class="question" id="interview-question"></div>
+      <div class="chips" id="interview-followups"></div>
+      <p></p>
+      <div class="field"><label>Answer<textarea id="interview-answer"></textarea></label></div>
       <div class="row">
-        <label class="wide">Question bank<select id="bank"><option>Loading banks…</option></select></label>
-        <button id="start-interview" type="button">Start</button>
-        <label>Resume session<input id="resume-id" placeholder="session id"></label>
+        <label>Visibility<select id="interview-visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
+        <button id="answer-interview" type="button">Save answer</button>
+        <button id="skip-interview" class="secondary" type="button">Skip</button>
+      </div>
+    </div>
+    <details>
+      <summary>Resume an earlier session</summary>
+      <div class="row">
+        <label>Session id<input id="resume-id" placeholder="session id"></label>
         <button id="resume-interview" class="secondary" type="button">Resume</button>
       </div>
-      <div id="interview-active" class="hidden">
-        <p class="muted" id="interview-meta"></p>
-        <div class="question" id="interview-question"></div>
-        <div class="chips" id="interview-followups"></div><br>
-        <label>Answer<textarea id="interview-answer"></textarea></label><br>
-        <div class="row">
-          <label>Visibility<select id="interview-visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
-          <button id="answer-interview" type="button">Save answer</button>
-          <button id="skip-interview" class="secondary" type="button">Skip</button>
-        </div>
-      </div>
-      <pre id="interview-result" class="hidden"></pre>
-    </section>
+    </details>
+    <pre id="interview-result" class="hidden"></pre>
+  </section>
 
-    <section class="card span-4">
-      <h2>Media ingest</h2>
-      <p class="muted">Copies recognized files from a local directory; originals are not modified.</p>
-      <form id="media-form">
-        <label>Source directory<input name="source" required></label><br>
-        <div class="row">
-          <label>Date<input name="date" placeholder="optional"></label>
-          <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
-        </div><br>
-        <label class="check"><input name="date_from_exif" type="checkbox"> Try capture date via ffprobe</label><br>
-        <button type="submit">Ingest media</button>
-      </form>
-      <pre id="media-result" class="hidden"></pre>
-    </section>
-
-    <section class="card span-6">
-      <h2>Maintenance</h2>
-      <p class="muted">Derived state is rebuildable. Verification checks the manifest against disk.</p>
+  <section class="card view hidden" id="view-media">
+    <h2>Media ingest</h2>
+    <p class="muted">Copies recognized files from a directory on the server; originals are not modified.</p>
+    <form id="media-form">
+      <div class="field"><label>Source directory<input name="source" required></label></div>
       <div class="row">
-        <button id="verify" type="button">Verify</button>
-        <button id="build" class="secondary" type="button">Rebuild timeline + index</button>
+        <label>Date<input name="date" placeholder="optional"></label>
+        <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
       </div>
-      <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
-      <p class="muted">LLM tag suggestions are a preview unless you explicitly apply them.</p>
+      <p></p>
+      <label class="check"><input name="date_from_exif" type="checkbox"> Try capture date via ffprobe</label>
+      <p></p>
+      <button type="submit">Ingest media</button>
+    </form>
+    <pre id="media-result" class="hidden"></pre>
+  </section>
+
+  <section class="card view hidden" id="view-ask">
+    <h2>Ask the replica</h2>
+    <p class="muted">Uses the configured OpenAI-compatible endpoint and only answers from stored stories.</p>
+    <form id="ask-form">
+      <div class="field"><label>Question<textarea name="question" required placeholder="What did you do after school?"></textarea></label></div>
+      <button type="submit">Ask</button>
+    </form>
+    <pre id="ask-result" class="hidden"></pre>
+  </section>
+
+  <section class="card view hidden" id="view-maintenance">
+    <h2>Maintenance</h2>
+    <p class="muted">Derived state is rebuildable. Verification checks the manifest against disk.</p>
+    <div class="row">
+      <button id="verify" type="button">Verify</button>
+      <button id="build" class="secondary" type="button">Rebuild timeline + index</button>
+    </div>
+    <details>
+      <summary>LLM tag suggestions</summary>
+      <p class="muted">Suggestions are a preview unless you explicitly apply them.</p>
       <div class="row">
         <button id="tag-preview" class="secondary" type="button">Preview tags</button>
         <button id="tag-apply" type="button">Apply suggested tags</button>
       </div>
-      <pre id="maintenance-result" class="hidden"></pre>
-    </section>
+    </details>
+    <pre id="maintenance-result" class="hidden"></pre>
+  </section>
 
-    <section class="card span-6">
-      <h2>Seal</h2>
-      <p class="notice danger"><strong>Shares are shown once.</strong> Copy and distribute them before leaving or refreshing this page. The archive does not retain them.</p>
+  <section class="card view hidden" id="view-seal">
+    <h2>Seal</h2>
+    <p class="notice danger"><strong>Shares are shown once.</strong> Copy and distribute them before leaving or refreshing this page. The archive does not retain them.</p>
+    <label class="check"><input id="tier-family" type="checkbox" checked> family</label>
+    <p></p>
+    <label class="check"><input id="tier-executor" type="checkbox" checked> executor-only</label>
+    <p></p>
+    <label class="check"><input id="plaintext-escrow" type="checkbox"> plaintext family escrow</label>
+    <p></p>
+    <button id="seal" class="danger" type="button">Seal selected tiers</button>
+    <pre id="seal-result" class="hidden"></pre>
+  </section>
+
+  <section class="card view hidden" id="view-unseal">
+    <h2>Unseal</h2>
+    <p class="muted">Paste enough SLIP-0039 shares for one tier, one complete share per line.</p>
+    <form id="unseal-form">
+      <div class="field"><label>Shares<textarea name="shares" required></textarea></label></div>
+      <div class="field"><label>Output directory<input name="output" placeholder="optional; defaults inside archive"></label></div>
+      <button type="submit">Unseal</button>
+    </form>
+    <pre id="unseal-result" class="hidden"></pre>
+  </section>
+
+  <section class="card view hidden" id="view-archive">
+    <h2>Archive</h2>
+    <p class="muted" id="archive-summary">Loading…</p>
+    <details>
+      <summary>Use a different archive</summary>
+      <p class="muted">Leave blank to use the server's default archive, which is created automatically on first use.</p>
       <div class="row">
-        <label class="check"><input id="tier-family" type="checkbox" checked> family</label>
-        <label class="check"><input id="tier-executor" type="checkbox" checked> executor-only</label>
-        <label class="check"><input id="plaintext-escrow" type="checkbox"> plaintext family escrow</label>
-        <button id="seal" class="danger" type="button">Seal selected tiers</button>
+        <label>Archive path<input id="archive-override" placeholder="/home/me/my-archive"></label>
+        <button id="use-archive" type="button">Use</button>
+        <button id="clear-archive" class="secondary" type="button">Use default</button>
       </div>
-      <pre id="seal-result" class="hidden"></pre>
-    </section>
-
-    <section class="card span-12">
-      <h2>Unseal</h2>
-      <p class="muted">Paste enough SLIP-0039 shares for one tier, one complete share per line.</p>
-      <form id="unseal-form">
+    </details>
+    <details>
+      <summary>Create a new archive</summary>
+      <form id="init-form">
+        <div class="field"><label>Path<input name="path" required placeholder="/home/me/my-archive"></label></div>
+        <div class="field"><label>Subject<input name="subject" required placeholder="Jane Doe"></label></div>
         <div class="row">
-          <label style="flex:3 1 420px">Shares<textarea name="shares" required></textarea></label>
-          <label>Output directory<input name="output" placeholder="optional; defaults inside archive"></label>
-          <button type="submit">Unseal</button>
+          <label>Threshold<input name="threshold" type="number" min="1" value="3"></label>
+          <label>Shares<input name="shares" type="number" min="1" value="5"></label>
         </div>
+        <p></p>
+        <button type="submit">Create archive</button>
       </form>
-      <pre id="unseal-result" class="hidden"></pre>
-    </section>
-  </div>
+    </details>
+    <pre id="archive-result" class="hidden"></pre>
+  </section>
 </main>
 
 <script>
@@ -297,16 +394,33 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const archiveInput = $('archive');
+  const VIEWS = ['add', 'stories', 'interview', 'media', 'ask', 'maintenance', 'seal', 'unseal', 'archive'];
+  const DEFAULT_VIEW = 'add';
   let sessionId = null;
+  let banksLoaded = false;
 
-  archiveInput.value = localStorage.getItem('legacy.archive') || '';
+  /* ---------- archive selection ----------
+     Empty means "whatever archive the server resolved for itself". The
+     path is only sent when the operator deliberately overrode it, so the
+     common case needs no configuration at all. */
 
-  function archive() {
-    const value = archiveInput.value.trim();
-    if (!value) throw new Error('Set an archive path first.');
-    localStorage.setItem('legacy.archive', value);
-    return value;
+  function archiveOverride() {
+    return (localStorage.getItem('legacy.archive') || '').trim();
+  }
+
+  function withArchive(body) {
+    const override = archiveOverride();
+    return override ? Object.assign({ archive: override }, body) : body;
+  }
+
+  function archiveParams(extra = {}) {
+    const params = new URLSearchParams();
+    const override = archiveOverride();
+    if (override) params.set('archive', override);
+    for (const [key, value] of Object.entries(extra)) {
+      if (value) params.set(key, value);
+    }
+    return params;
   }
 
   function csv(value) {
@@ -317,20 +431,26 @@
     return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
   }
 
-  function setBusy(button, busy) {
-    if (!button) return;
-    button.disabled = busy;
-  }
-
   function show(id, value) {
     const el = $(id);
     el.classList.remove('hidden');
     el.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   }
 
+  function banner(message, bad) {
+    const el = $('banner');
+    if (!message) {
+      el.classList.add('hidden');
+      return;
+    }
+    el.textContent = message;
+    el.classList.toggle('bad', Boolean(bad));
+    el.classList.remove('hidden');
+  }
+
   function fail(id, error) {
     show(id, `Error: ${error.message}`);
-    $('status').textContent = 'request failed';
+    banner(error.message, true);
   }
 
   async function api(path, options = {}) {
@@ -345,16 +465,100 @@
       throw new Error(`HTTP ${response.status}: invalid JSON response`);
     }
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
-    $('status').textContent = 'connected';
+    banner('');
     return data;
   }
 
   async function action(button, resultId, fn) {
-    setBusy(button, true);
+    if (button) button.disabled = true;
     try { return await fn(); }
     catch (error) { fail(resultId, error); return null; }
-    finally { setBusy(button, false); }
+    finally { if (button) button.disabled = false; }
   }
+
+  /* ---------- navigation ---------- */
+
+  function showView(name) {
+    const view = VIEWS.includes(name) ? name : DEFAULT_VIEW;
+    for (const candidate of VIEWS) {
+      $(`view-${candidate}`).classList.toggle('hidden', candidate !== view);
+    }
+    for (const link of document.querySelectorAll('nav a')) {
+      link.classList.toggle('current', link.dataset.view === view);
+    }
+    // Collapse the drawer after a choice, or the next view opens under it.
+    $('nav').classList.remove('open');
+    $('menu-toggle').setAttribute('aria-expanded', 'false');
+    window.scrollTo(0, 0);
+
+    if (view === 'stories') loadStories().catch((error) => fail('banner', error));
+    if (view === 'interview') loadBanks();
+    if (view === 'archive') loadArchive();
+  }
+
+  function currentView() {
+    return (location.hash || '').replace(/^#/, '') || DEFAULT_VIEW;
+  }
+
+  window.addEventListener('hashchange', () => showView(currentView()));
+
+  $('menu-toggle').addEventListener('click', () => {
+    const nav = $('nav');
+    const open = nav.classList.toggle('open');
+    $('menu-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  $('archive-chip').addEventListener('click', () => { location.hash = '#archive'; });
+
+  /* ---------- archive ---------- */
+
+  async function loadArchive() {
+    try {
+      const info = await api(`/archive?${archiveParams().toString()}`);
+      const stories = info.story_count === 1 ? '1 story' : `${info.story_count} stories`;
+      $('archive-chip').textContent = info.subject;
+      $('archive-summary').textContent = `${info.subject} — ${stories} — ${info.root}`;
+      $('archive-override').value = archiveOverride();
+    } catch (error) {
+      $('archive-chip').textContent = 'archive?';
+      $('archive-summary').textContent = `Could not read the archive: ${error.message}`;
+    }
+  }
+
+  $('use-archive').addEventListener('click', () => action($('use-archive'), 'archive-result', async () => {
+    localStorage.setItem('legacy.archive', $('archive-override').value.trim());
+    await loadArchive();
+    show('archive-result', 'Switched archive.');
+  }));
+
+  $('clear-archive').addEventListener('click', () => action($('clear-archive'), 'archive-result', async () => {
+    localStorage.removeItem('legacy.archive');
+    $('archive-override').value = '';
+    await loadArchive();
+    show('archive-result', 'Using the server default archive.');
+  }));
+
+  $('init-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    action(event.submitter, 'archive-result', async () => {
+      const data = new FormData(form);
+      const result = await api('/init', {
+        method: 'POST',
+        body: JSON.stringify({
+          path: String(data.get('path')).trim(),
+          subject: String(data.get('subject')).trim(),
+          threshold: Number(data.get('threshold')),
+          shares: Number(data.get('shares'))
+        })
+      });
+      localStorage.setItem('legacy.archive', result.root);
+      show('archive-result', result);
+      await loadArchive();
+    });
+  });
+
+  /* ---------- stories ---------- */
 
   function addChip(parent, text) {
     const chip = document.createElement('span');
@@ -369,7 +573,7 @@
     if (!stories.length) {
       const empty = document.createElement('span');
       empty.className = 'muted';
-      empty.textContent = 'No stories matched.';
+      empty.textContent = 'No stories yet. Add one from the "Add a story" page.';
       root.appendChild(empty);
       return;
     }
@@ -397,18 +601,59 @@
   }
 
   async function loadStories() {
-    const params = new URLSearchParams({ archive: archive() });
-    const year = $('filter-year').value.trim();
-    const person = $('filter-person').value.trim();
-    const tag = $('filter-tag').value.trim();
-    if (year) params.set('year', year);
-    if (person) params.set('person', person);
-    if (tag) params.set('tag', tag);
-    const stories = await api(`/stories?${params.toString()}`);
-    renderStories(stories);
+    const params = archiveParams({
+      year: $('filter-year').value.trim(),
+      person: $('filter-person').value.trim(),
+      tag: $('filter-tag').value.trim()
+    });
+    renderStories(await api(`/stories?${params.toString()}`));
   }
 
+  $('refresh-stories').addEventListener('click', () => action($('refresh-stories'), 'banner', loadStories));
+
+  $('story-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    action(event.submitter, 'story-result', async () => {
+      const data = new FormData(form);
+      const result = await api('/stories', {
+        method: 'POST',
+        body: JSON.stringify(withArchive({
+          title: String(data.get('title')).trim(),
+          date: String(data.get('date')).trim() || null,
+          body: String(data.get('body')),
+          people: csv(String(data.get('people'))),
+          places: csv(String(data.get('places'))),
+          tags: csv(String(data.get('tags'))),
+          visibility: String(data.get('visibility'))
+        }))
+      });
+      show('story-result', `Saved ${result.path || result.id || ''}`.trim());
+      form.reset();
+      form.querySelector('[name=title]').focus();
+      loadArchive();
+    });
+  });
+
+  /* ---------- ask ---------- */
+
+  $('ask-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    action(event.submitter, 'ask-result', async () => {
+      const data = new FormData(form);
+      const result = await api('/ask', {
+        method: 'POST',
+        body: JSON.stringify(withArchive({ question: String(data.get('question')).trim() }))
+      });
+      show('ask-result', `Answer:\n${result.answer}\n\nCited stories:\n${(result.cited_story_ids || []).join('\n')}`);
+    });
+  });
+
+  /* ---------- interview ---------- */
+
   async function loadBanks() {
+    if (banksLoaded) return;
     try {
       const banks = await api('/banks');
       const select = $('bank');
@@ -419,6 +664,7 @@
         option.textContent = `${bank.name} — ${bank.description} (${bank.question_count})`;
         select.appendChild(option);
       }
+      banksLoaded = true;
     } catch (error) {
       fail('interview-result', error);
     }
@@ -443,126 +689,82 @@
     for (const followup of session.next_question.followups || []) addChip($('interview-followups'), followup);
   }
 
-  $('load').addEventListener('click', () => action($('load'), 'maintenance-result', async () => {
-    await loadStories();
-    await loadBanks();
-  }));
-  $('refresh-stories').addEventListener('click', () => action($('refresh-stories'), 'maintenance-result', loadStories));
-
-  $('init-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const button = event.submitter;
-    action(button, 'init-result', async () => {
-      const form = new FormData(event.currentTarget);
-      const body = {
-        path: String(form.get('path')).trim(),
-        subject: String(form.get('subject')).trim(),
-        threshold: Number(form.get('threshold')),
-        shares: Number(form.get('shares'))
-      };
-      const result = await api('/init', { method: 'POST', body: JSON.stringify(body) });
-      archiveInput.value = result.root;
-      localStorage.setItem('legacy.archive', result.root);
-      show('init-result', result);
-      await loadStories();
-    });
-  });
-
-  $('story-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const button = event.submitter;
-    action(button, 'story-result', async () => {
-      const form = new FormData(event.currentTarget);
-      const body = {
-        archive: archive(),
-        title: String(form.get('title')).trim(),
-        date: String(form.get('date')).trim() || null,
-        body: String(form.get('body')),
-        people: csv(String(form.get('people'))),
-        places: csv(String(form.get('places'))),
-        tags: csv(String(form.get('tags'))),
-        visibility: String(form.get('visibility'))
-      };
-      const result = await api('/stories', { method: 'POST', body: JSON.stringify(body) });
-      show('story-result', result);
-      event.currentTarget.reset();
-      await loadStories();
-    });
-  });
-
-  $('ask-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    action(event.submitter, 'ask-result', async () => {
-      const form = new FormData(event.currentTarget);
-      const result = await api('/ask', { method: 'POST', body: JSON.stringify({ archive: archive(), question: String(form.get('question')).trim() }) });
-      show('ask-result', `Answer:\n${result.answer}\n\nCited stories:\n${(result.cited_story_ids || []).join('\n')}`);
-    });
-  });
-
   $('start-interview').addEventListener('click', () => action($('start-interview'), 'interview-result', async () => {
-    const result = await api('/interviews', { method: 'POST', body: JSON.stringify({ archive: archive(), bank: $('bank').value }) });
-    renderInterview(result);
-    show('interview-result', result);
+    renderInterview(await api('/interviews', {
+      method: 'POST',
+      body: JSON.stringify(withArchive({ bank: $('bank').value }))
+    }));
   }));
 
   $('resume-interview').addEventListener('click', () => action($('resume-interview'), 'interview-result', async () => {
     const id = $('resume-id').value.trim();
     if (!id) throw new Error('Enter a session id.');
-    const result = await api(`/interviews/${encodeURIComponent(id)}?archive=${encodeURIComponent(archive())}`);
-    renderInterview(result);
-    show('interview-result', result);
+    const params = archiveParams();
+    renderInterview(await api(`/interviews/${encodeURIComponent(id)}?${params.toString()}`));
   }));
 
   $('answer-interview').addEventListener('click', () => action($('answer-interview'), 'interview-result', async () => {
     if (!sessionId) throw new Error('Start or resume an interview first.');
     const answer = $('interview-answer').value.trim();
     if (!answer) throw new Error('Enter an answer.');
-    const result = await api(`/interviews/${encodeURIComponent(sessionId)}/answer`, { method: 'POST', body: JSON.stringify({ archive: archive(), answer, visibility: $('interview-visibility').value }) });
-    renderInterview(result);
-    show('interview-result', result);
-    await loadStories();
+    renderInterview(await api(`/interviews/${encodeURIComponent(sessionId)}/answer`, {
+      method: 'POST',
+      body: JSON.stringify(withArchive({ answer, visibility: $('interview-visibility').value }))
+    }));
+    loadArchive();
   }));
 
   $('skip-interview').addEventListener('click', () => action($('skip-interview'), 'interview-result', async () => {
     if (!sessionId) throw new Error('Start or resume an interview first.');
-    const result = await api(`/interviews/${encodeURIComponent(sessionId)}/skip`, { method: 'POST', body: JSON.stringify({ archive: archive() }) });
-    renderInterview(result);
-    show('interview-result', result);
+    renderInterview(await api(`/interviews/${encodeURIComponent(sessionId)}/skip`, {
+      method: 'POST',
+      body: JSON.stringify(withArchive({}))
+    }));
   }));
+
+  /* ---------- media ---------- */
 
   $('media-form').addEventListener('submit', (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     action(event.submitter, 'media-result', async () => {
-      const form = new FormData(event.currentTarget);
-      const body = {
-        archive: archive(),
-        source: String(form.get('source')).trim(),
-        date: String(form.get('date')).trim() || null,
-        visibility: String(form.get('visibility')),
-        date_from_exif: form.get('date_from_exif') === 'on'
-      };
-      const result = await api('/media/ingest', { method: 'POST', body: JSON.stringify(body) });
+      const data = new FormData(form);
+      const result = await api('/media/ingest', {
+        method: 'POST',
+        body: JSON.stringify(withArchive({
+          source: String(data.get('source')).trim(),
+          date: String(data.get('date')).trim() || null,
+          visibility: String(data.get('visibility')),
+          date_from_exif: data.get('date_from_exif') === 'on'
+        }))
+      });
       show('media-result', result);
     });
   });
 
+  /* ---------- maintenance ---------- */
+
   $('verify').addEventListener('click', () => action($('verify'), 'maintenance-result', async () => {
-    const result = await api(`/verify?archive=${encodeURIComponent(archive())}`);
-    show('maintenance-result', result);
+    show('maintenance-result', await api(`/verify?${archiveParams().toString()}`));
   }));
 
   $('build').addEventListener('click', () => action($('build'), 'maintenance-result', async () => {
-    const result = await api('/timeline/build', { method: 'POST', body: JSON.stringify({ archive: archive() }) });
-    show('maintenance-result', result);
+    show('maintenance-result', await api('/timeline/build', {
+      method: 'POST',
+      body: JSON.stringify(withArchive({}))
+    }));
   }));
 
   async function tags(apply) {
-    const result = await api('/tag', { method: 'POST', body: JSON.stringify({ archive: archive(), apply }) });
-    show('maintenance-result', result);
-    if (apply) await loadStories();
+    show('maintenance-result', await api('/tag', {
+      method: 'POST',
+      body: JSON.stringify(withArchive({ apply }))
+    }));
   }
   $('tag-preview').addEventListener('click', () => action($('tag-preview'), 'maintenance-result', () => tags(false)));
   $('tag-apply').addEventListener('click', () => action($('tag-apply'), 'maintenance-result', () => tags(true)));
+
+  /* ---------- seal / unseal ---------- */
 
   $('seal').addEventListener('click', () => action($('seal'), 'seal-result', async () => {
     const tiers = [];
@@ -570,26 +772,28 @@
     if ($('tier-executor').checked) tiers.push('executor-only');
     if (!tiers.length) throw new Error('Select at least one tier.');
     if (!confirm(`Seal ${tiers.join(' and ')} now? Newly generated shares must be copied before this page is closed.`)) return;
-    const result = await api('/seal', { method: 'POST', body: JSON.stringify({ archive: archive(), tiers, plaintext_escrow: $('plaintext-escrow').checked }) });
-    show('seal-result', result);
+    show('seal-result', await api('/seal', {
+      method: 'POST',
+      body: JSON.stringify(withArchive({ tiers, plaintext_escrow: $('plaintext-escrow').checked }))
+    }));
   }));
 
   $('unseal-form').addEventListener('submit', (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     action(event.submitter, 'unseal-result', async () => {
-      const form = new FormData(event.currentTarget);
-      const body = { archive: archive(), shares: lines(String(form.get('shares'))) };
-      const output = String(form.get('output')).trim();
+      const data = new FormData(form);
+      const body = withArchive({ shares: lines(String(data.get('shares'))) });
+      const output = String(data.get('output')).trim();
       if (output) body.output = output;
-      const result = await api('/unseal', { method: 'POST', body: JSON.stringify(body) });
-      show('unseal-result', result);
+      show('unseal-result', await api('/unseal', { method: 'POST', body: JSON.stringify(body) }));
     });
   });
 
-  loadBanks();
-  if (archiveInput.value) {
-    loadStories().catch((error) => fail('maintenance-result', error));
-  }
+  /* ---------- start ---------- */
+
+  showView(currentView());
+  loadArchive();
 })();
 </script>
 </body>

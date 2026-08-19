@@ -12,7 +12,7 @@ use crate::core::media::{self, IngestOptions};
 use crate::core::seal;
 use crate::core::story::{self, NewStory, Visibility};
 use crate::core::timeline;
-use crate::core::vault::Vault;
+use crate::core::vault::{self, Vault};
 
 pub const HELP: &str = "\
 legacy — a self-hosted life-story vault and digital replica
@@ -179,12 +179,17 @@ fn failed(message: String) -> Failure {
     }
 }
 
-fn archive_root(args: &Args) -> PathBuf {
-    PathBuf::from(args.option("archive").unwrap_or("."))
-}
-
+/// Open the archive a command is to work on.
+///
+/// With no `--archive`, the default archive is created on demand, so a
+/// fresh install has somewhere to write without an `init` step first. A
+/// path given explicitly is never created here: a typo should fail
+/// loudly rather than quietly start a second, empty archive.
 fn open_vault(args: &Args) -> Result<Vault, Failure> {
-    Vault::open(&archive_root(args)).map_err(|error| failed(error.0))
+    match args.option("archive") {
+        Some(named) => Vault::open(Path::new(named)).map_err(|error| failed(error.0)),
+        None => vault::open_or_init(&vault::default_root()).map_err(|error| failed(error.0)),
+    }
 }
 
 fn parse_visibility(args: &Args) -> Result<Option<Visibility>, Failure> {

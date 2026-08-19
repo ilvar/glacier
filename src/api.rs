@@ -21,7 +21,7 @@ use crate::core::media::{self, IngestOptions};
 use crate::core::seal;
 use crate::core::story::{self, NewStory, Visibility};
 use crate::core::timeline;
-use crate::core::vault::Vault;
+use crate::core::vault::{self, Vault};
 
 /// An HTTP status and a JSON body.
 struct Reply {
@@ -170,6 +170,7 @@ fn route(method: &str, url: &str, body: &str) -> Reply {
         ("POST", "/tag") => handle_tag(&parsed_body),
         ("POST", "/ask") => handle_ask(&parsed_body),
         ("GET", "/banks") => handle_banks(),
+        ("GET", "/archive") => handle_archive(query),
         (_method, other) => {
             if let Some(rest) = other.strip_prefix("/interviews/") {
                 return route_interview(method, rest, &parsed_body, query);
@@ -213,12 +214,22 @@ fn body_bool(body: &Value, key: &str) -> bool {
     body.get(key).and_then(Value::as_bool).unwrap_or(false)
 }
 
-/// Resolve and open the archive named in a request.
+/// Resolve and open the archive a request works on.
+///
+/// A request that names no archive gets the default one, created if it
+/// does not exist yet, so the web UI needs no path typed into it before
+/// anything works. A request that does name one is opened as given and
+/// never created implicitly — a wrong path should say so rather than
+/// silently become a new empty archive.
 fn vault_from(archive: Option<String>) -> Result<Vault, Reply> {
-    let Some(archive) = archive else {
-        return Err(Reply::error(400, "request needs an \"archive\" path"));
-    };
-    Vault::open(Path::new(&archive)).map_err(|error| Reply::error(404, &error.0))
+    match archive {
+        Some(archive) => {
+            Vault::open(Path::new(&archive)).map_err(|error| Reply::error(404, &error.0))
+        }
+        None => {
+            vault::open_or_init(&vault::default_root()).map_err(|error| Reply::error(500, &error.0))
+        }
+    }
 }
 
 fn visibility_from(body: &Value) -> Result<Option<Visibility>, Reply> {
@@ -452,6 +463,27 @@ fn handle_banks() -> Reply {
         })
         .collect();
     Reply::ok(Value::Array(banks))
+}
+
+/// Which archive this server is writing to, so the UI can say so without
+/// making the operator supply the path it already resolved itself.
+fn handle_archive(query: &str) -> Reply {
+    let vault = match vault_from(query_param(query, "archive")) {
+        Ok(vault) => vault,
+        Err(reply) => return reply,
+    };
+    let config = match vault.load_config() {
+        Ok(config) => config,
+        Err(error) => return Reply::error(500, &error.0),
+    };
+    let story_count = story::iter_stories(&vault.root)
+        .map(|stories| stories.len())
+        .unwrap_or(0);
+    Reply::ok(json!({
+        "root": vault.root.display().to_string(),
+        "subject": config.subject_name,
+        "story_count": story_count,
+    }))
 }
 
 fn handle_interview_start(body: &Value) -> Reply {
@@ -702,6 +734,35 @@ mod tests {
         Vault::init(&root, "Jane Doe", 2, 3).expect("init");
         let text = root.to_str().expect("utf-8").to_owned();
         (temp, text)
+    }
+
+    /// The web UI shows the operator which archive it is writing to
+    /// instead of asking them to type the path it already resolved.
+    ///
+    /// Only the explicitly-named case is exercised here: the no-archive
+    /// path resolves through `LEGACY_ARCHIVE`, and cargo runs tests in
+    /// parallel threads against one process-wide environment, so setting
+    /// it here would race `vault`'s own tests. Both halves of that path
+    /// are covered there instead.
+    #[test]
+    fn archive_endpoint_reports_the_open_archive() {
+        let (_temp, root) = archive();
+        let reply = route("GET", &format!("/archive?archive={root}"), "");
+
+        assert_eq!(reply.status, 200);
+        assert_eq!(
+            reply.body.get("subject").and_then(|v| v.as_str()),
+            Some("Jane Doe")
+        );
+        assert_eq!(
+            reply.body.get("story_count").and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        assert!(reply
+            .body
+            .get("root")
+            .and_then(|v| v.as_str())
+            .is_some_and(|shown| shown.contains("arch")));
     }
 
     #[test]

@@ -87,6 +87,33 @@ legacy seal --archive ./my-archive
 legacy unseal --archive ./my-archive --share "..." --share "..."
 ```
 
+### The default archive
+
+`--archive` is optional. Left out, every command uses the default
+archive and creates it on first use, so there is nothing to set up
+before writing the first story:
+
+```bash
+legacy story add --title "Starting university" --date 1994-09-15
+```
+
+The default is resolved in this order:
+
+1. `LEGACY_ARCHIVE`, if set.
+2. The working directory, but only when an archive is already there — so
+   running commands inside an archive needs no flag.
+3. Otherwise `$XDG_DATA_HOME/legacy/archive`, falling back to
+   `~/.local/share/legacy/archive`.
+
+`LEGACY_SUBJECT` names the subject of an archive created this way; without
+it the subject is a placeholder to edit in `archive.yaml` later. A path
+given explicitly with `--archive` is never created implicitly — a typo
+should fail rather than quietly start a second, empty archive.
+
+The same resolution applies to the web UI and the terminal browser. The
+Docker image sets `LEGACY_ARCHIVE=/data` so the default archive lands on
+the mounted volume.
+
 ## Terminal browser
 
 ```bash
@@ -385,10 +412,10 @@ interview either way and works fully without it.
 
 ## REST API
 
-`legacy serve` runs a FastAPI app that mirrors the CLI 1:1 (JSON in, JSON
-out), bound to `127.0.0.1` by default. There is no authentication in v1 —
-it's meant for a single local user (e.g. a future GUI) driving the same
-machine, not a multi-tenant service. If you expose it beyond localhost,
+`legacy serve` runs a small HTTP server that mirrors the CLI 1:1 (JSON in,
+JSON out) and serves the web UI at `/`, bound to `127.0.0.1` by default.
+There is no authentication in v1 — it's meant for a single local user
+driving the same machine, not a multi-tenant service. If you expose it beyond localhost,
 put a reverse proxy with auth in front yourself. There's no server-side
 session state beyond the interview session id, which is just the filename
 of an already-persisted session file.
@@ -400,11 +427,15 @@ curl -X POST localhost:8000/stories -H 'content-type: application/json' -d '{
   "archive": "./my-archive", "title": "Starting university", "date": "1994-09-15"
 }'
 curl "localhost:8000/stories?archive=./my-archive&year=1994"
+
+# "archive" is optional; without it a request uses the default archive,
+# created on first use, which is what the web UI relies on.
+curl localhost:8000/archive
 ```
 
-Routes: `POST /init`, `POST /stories`, `GET /stories`, `POST /timeline/build`,
-`GET /verify`, `POST /media/ingest`, `POST /interviews`,
-`GET /interviews/{id}`, `POST /interviews/{id}/answer`,
+Routes: `POST /init`, `GET /archive`, `POST /stories`, `GET /stories`,
+`POST /timeline/build`, `GET /verify`, `POST /media/ingest`,
+`POST /interviews`, `GET /interviews/{id}`, `POST /interviews/{id}/answer`,
 `POST /interviews/{id}/skip`, `POST /seal`, `POST /unseal`, `POST /tag`,
 `POST /ask`. `POST /seal`'s response body contains the shares — same
 "printed once, never stored" rule as the CLI, just delivered over HTTP

@@ -308,6 +308,67 @@ impl Vault {
     }
 }
 
+/// Subject name for an archive created without one being given.
+///
+/// Deliberately an obvious placeholder rather than a guess from the
+/// system username: this name is written into the archive's own
+/// README.txt, where a confidently wrong name is worse than a blank one
+/// somebody edits in `archive.yaml` later.
+pub const DEFAULT_SUBJECT: &str = "Unnamed subject";
+pub const DEFAULT_THRESHOLD: u64 = 3;
+pub const DEFAULT_SHARES: u64 = 5;
+
+/// Where the archive lives when no path was given.
+///
+/// In order: `LEGACY_ARCHIVE`; then the working directory, but only when
+/// an archive is already there; then a per-user data directory. The
+/// working-directory check is second and conditional on purpose — running
+/// a command inside an existing archive should need no flag, while
+/// running one anywhere else should land in a single stable archive
+/// rather than scattering new ones across whatever directory the shell
+/// happened to be in.
+pub fn default_root() -> PathBuf {
+    if let Some(named) = crate::core::env::first(&["LEGACY_ARCHIVE"]) {
+        return PathBuf::from(named);
+    }
+
+    let here = PathBuf::from(".");
+    if Vault::at(&here).exists() {
+        return here;
+    }
+
+    let data_home = crate::core::env::first(&["XDG_DATA_HOME"])
+        .map(PathBuf::from)
+        .or_else(|| {
+            crate::core::env::first(&["HOME", "USERPROFILE"])
+                .map(|home| PathBuf::from(home).join(".local").join("share"))
+        });
+
+    match data_home {
+        Some(base) => base.join("legacy").join("archive"),
+        // Nowhere per-user to put it: use the working directory rather
+        // than failing, so the program still runs in a bare container.
+        None => here,
+    }
+}
+
+/// Open the archive at `root`, creating an empty one if none is there.
+///
+/// Every front end uses this when the operator named no archive, so a
+/// first run lands in a working vault instead of an error telling them to
+/// go and run `init` first. An explicitly named path never goes through
+/// here: a typo in one should fail loudly, not quietly start a second
+/// empty archive somewhere unexpected.
+pub fn open_or_init(root: &Path) -> Result<Vault, VaultError> {
+    let vault = Vault::at(root);
+    if vault.exists() {
+        return Ok(vault);
+    }
+    let subject =
+        crate::core::env::first(&["LEGACY_SUBJECT"]).unwrap_or_else(|| DEFAULT_SUBJECT.to_owned());
+    Vault::init(root, &subject, DEFAULT_THRESHOLD, DEFAULT_SHARES)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ArchiveConfig, Vault};
@@ -353,6 +414,49 @@ mod tests {
     fn open_requires_an_existing_archive() {
         let temp = tempfile::TempDir::new().expect("temp dir");
         assert!(Vault::open(&temp.path().join("nope")).is_err());
+    }
+
+    #[test]
+    fn open_or_init_creates_once_then_reopens() {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let root = temp.path().join("fresh");
+
+        let created = super::open_or_init(&root).expect("creates on first use");
+        assert!(created.exists());
+        let subject = created.load_config().expect("config").subject_name;
+
+        // Write a story, then reopen: the second call must find the same
+        // archive rather than starting a new one over the top of it.
+        cap::fs::write(&root.join("timeline").join("undated").join("x.md"), "hi").expect("write");
+        let reopened = super::open_or_init(&root).expect("reopens");
+        assert_eq!(reopened.root, created.root);
+        assert_eq!(
+            reopened.load_config().expect("config").subject_name,
+            subject
+        );
+        assert!(root.join("timeline").join("undated").join("x.md").exists());
+    }
+
+    /// All `LEGACY_ARCHIVE` handling lives in one test on purpose:
+    /// environment variables are process-wide, and cargo runs tests in
+    /// parallel threads, so splitting these would make them race.
+    #[test]
+    fn default_root_prefers_the_named_archive() {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let named = temp.path().join("named");
+
+        std::env::set_var("LEGACY_ARCHIVE", &named);
+        assert_eq!(super::default_root(), named);
+
+        // An empty value is not a configured path; falling back beats
+        // trying to open an archive rooted at "".
+        std::env::set_var("LEGACY_ARCHIVE", "");
+        assert_ne!(super::default_root(), std::path::PathBuf::from(""));
+
+        std::env::remove_var("LEGACY_ARCHIVE");
+        // Without one set, the fallback is still a usable path rather
+        // than a panic, whatever the environment looks like.
+        assert!(!super::default_root().as_os_str().is_empty());
     }
 
     #[test]
