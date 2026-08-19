@@ -20,5 +20,10 @@ WORKDIR /data
 VOLUME ["/data"]
 EXPOSE 8000
 
+# The archive to use when a request names none. Pinned to the volume so a
+# default-archive write lands on mounted storage rather than in a
+# container-local home directory that vanishes with the container.
+ENV LEGACY_ARCHIVE=/data
+
 ENTRYPOINT ["/usr/local/bin/legacy"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]
