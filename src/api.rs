@@ -168,6 +168,7 @@ fn route(method: &str, url: &str, body: &str) -> Reply {
         ("POST", "/seal") => handle_seal(&parsed_body),
         ("POST", "/unseal") => handle_unseal(&parsed_body),
         ("POST", "/tag") => handle_tag(&parsed_body),
+        ("POST", "/enrich") => handle_enrich(&parsed_body),
         ("POST", "/ask") => handle_ask(&parsed_body),
         ("GET", "/banks") => handle_banks(),
         ("GET", "/archive") => handle_archive(query),
@@ -285,16 +286,15 @@ fn handle_create_story(body: &Value) -> Reply {
         Ok(vault) => vault,
         Err(reply) => return reply,
     };
-    let Some(title) = body_str(body, "title") else {
-        return Reply::error(400, "a story needs a \"title\"");
-    };
     let visibility = match visibility_from(body) {
         Ok(visibility) => visibility,
         Err(reply) => return reply,
     };
 
-    let request = NewStory {
-        title,
+    let mut request = NewStory {
+        // Left optional so a model can supply it; `new_story` still
+        // refuses a story that ends up with no title at all.
+        title: body_str(body, "title").unwrap_or_default(),
         date: body_str(body, "date"),
         body: body_str(body, "body").unwrap_or_default(),
         people: body_list(body, "people"),
@@ -304,12 +304,37 @@ fn handle_create_story(body: &Value) -> Reply {
         ..NewStory::default()
     };
 
+    // Enrichment is a convenience, never a gate: if the model is missing,
+    // misconfigured or simply down, the story is still saved exactly as
+    // it was typed. Losing what someone wrote because a metadata helper
+    // failed would be indefensible.
+    let mut enriched: Vec<String> = Vec::new();
+    let mut enrich_error: Option<String> = None;
+    if body.get("enrich").and_then(Value::as_bool).unwrap_or(true) {
+        let settings = llm::LlmSettings::from_env();
+        if settings.api_key.is_some() {
+            match llm::enrich_new_story(&settings, &mut request) {
+                Ok(filled) => enriched = filled,
+                Err(error) => enrich_error = Some(error.0),
+            }
+        }
+    }
+
     let built = match story::new_story(request) {
         Ok(built) => built,
         Err(error) => return Reply::error(400, &error.0),
     };
     match story::save_story(&vault.root, &built, false) {
-        Ok(_path) => Reply::ok(story_json(&built)),
+        Ok(_path) => {
+            let mut payload = story_json(&built);
+            if let Some(object) = payload.as_object_mut() {
+                object.insert("enriched_fields".to_owned(), json!(enriched));
+                if let Some(error) = enrich_error {
+                    object.insert("enrich_error".to_owned(), json!(error));
+                }
+            }
+            Reply::ok(payload)
+        }
         Err(error) => Reply::error(400, &error.0),
     }
 }
@@ -658,6 +683,44 @@ fn handle_unseal(body: &Value) -> Reply {
     }
 }
 
+/// Backfill empty tags and people on stories already in the archive.
+///
+/// Defaults to a preview, like `/tag`: nothing is written unless the
+/// caller asks for it, so the operator sees what a model wants to add to
+/// their archive before it lands in the files.
+fn handle_enrich(body: &Value) -> Reply {
+    let vault = match vault_from(body_str(body, "archive")) {
+        Ok(vault) => vault,
+        Err(reply) => return reply,
+    };
+    let settings = llm::LlmSettings::from_env();
+    let apply = body_bool(body, "apply");
+
+    let reports = match llm::enrich_archive(&settings, &vault.root, apply) {
+        Ok(reports) => reports,
+        Err(error) => return Reply::error(400, &error.0),
+    };
+
+    let payload: Vec<Value> = reports
+        .iter()
+        .map(|report| {
+            json!({
+                "story_id": report.story_id,
+                "filled": report.filled,
+                "title": report.title,
+                "tags": report.tags,
+                "people": report.people,
+            })
+        })
+        .collect();
+
+    Reply::ok(json!({
+        "applied": apply,
+        "changed": payload.len(),
+        "stories": payload,
+    }))
+}
+
 fn handle_tag(body: &Value) -> Reply {
     let vault = match vault_from(body_str(body, "archive")) {
         Ok(vault) => vault,
@@ -765,6 +828,41 @@ mod tests {
             .is_some_and(|shown| shown.contains("arch")));
     }
 
+    /// Stories that need nothing must cost no tokens and no request, so
+    /// running the enrich button twice is cheap and safe. This also keeps
+    /// the test itself off the network whatever keys are in the
+    /// environment.
+    #[test]
+    fn enrich_skips_stories_that_need_nothing() {
+        let (_temp, root) = archive();
+        let created = route(
+            "POST",
+            "/stories",
+            &json!({
+                "archive": root,
+                "title": "Already described",
+                "tags": ["complete"],
+                "people": ["someone"],
+                "body": "Text.",
+                "enrich": false,
+            })
+            .to_string(),
+        );
+        assert_eq!(created.status, 200);
+
+        let enriched = route("POST", "/enrich", &json!({ "archive": root }).to_string());
+        assert_eq!(enriched.status, 200);
+        assert_eq!(
+            enriched.body.get("changed").and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        // A preview by default: nothing may be written unless asked.
+        assert_eq!(
+            enriched.body.get("applied").and_then(|v| v.as_bool()),
+            Some(false)
+        );
+    }
+
     #[test]
     fn decodes_query_parameters() {
         assert_eq!(split_url("/stories?archive=x"), ("/stories", "archive=x"));
@@ -790,6 +888,7 @@ mod tests {
                 "title": "Starting university",
                 "date": "1994-09-15",
                 "body": "I packed one suitcase.",
+                "enrich": false,
             })
             .to_string(),
         );
@@ -813,7 +912,8 @@ mod tests {
         route(
             "POST",
             "/stories",
-            &json!({ "archive": root, "title": "A story", "date": "2000" }).to_string(),
+            &json!({ "archive": root, "title": "A story", "date": "2000", "enrich": false })
+                .to_string(),
         );
 
         let built = route(
@@ -929,6 +1029,7 @@ mod tests {
                 "date": "1994",
                 "visibility": "family",
                 "body": "For the family.",
+                "enrich": false,
             })
             .to_string(),
         );
