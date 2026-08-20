@@ -67,7 +67,11 @@ pub fn slugify(text: &str) -> String {
     let mut slug = String::new();
     let mut pending_separator = false;
     for character in text.trim().to_lowercase().chars() {
-        if character.is_ascii_alphanumeric() {
+        // Unicode-aware on purpose: a life lived in Russian, Greek or
+        // Japanese must produce usable ids, and transliterating someone's
+        // own words into ASCII would be this program deciding their
+        // archive should be legible to English speakers first.
+        if character.is_alphanumeric() {
             if pending_separator && !slug.is_empty() {
                 slug.push('-');
             }
@@ -116,6 +120,10 @@ pub struct NewStory {
     /// Override the derived id. Used by the interview subsystem, which
     /// names stories after the session and question they came from.
     pub id: Option<String>,
+    /// `None` when a human wrote the tags, otherwise the model id. Set
+    /// when tags arrive from enrichment rather than from the operator, so
+    /// machine-written tags are never silently passed off as a person's.
+    pub tags_generated_by: Option<String>,
 }
 
 impl Story {
@@ -185,7 +193,7 @@ pub fn new_story(request: NewStory) -> Result<Story, StoryError> {
         media: request.media,
         source: request.source,
         recorded_at: request.recorded_at,
-        tags_generated_by: None,
+        tags_generated_by: request.tags_generated_by,
         visibility: request.visibility.unwrap_or(Visibility::Family),
     })
 }
@@ -299,6 +307,32 @@ mod tests {
         assert_eq!(slugify("Starting university"), "starting-university");
         assert_eq!(slugify("  Dad's  Boat!  "), "dad-s-boat");
         assert_eq!(slugify("---"), "");
+    }
+
+    #[test]
+    fn slugify_keeps_non_latin_scripts() {
+        // The archive belongs to whoever's life it records, so a title in
+        // their own script has to survive into the id rather than being
+        // stripped to nothing.
+        assert_eq!(slugify("Первый день в школе"), "первый-день-в-школе");
+        assert_eq!(slugify("Лето 1987"), "лето-1987");
+        assert_eq!(slugify("Ελλάδα"), "ελλάδα");
+        // Punctuation still separates, and a title of only punctuation is
+        // still empty, whatever the script.
+        assert_eq!(slugify("Дом, милый дом!"), "дом-милый-дом");
+    }
+
+    #[test]
+    fn a_non_latin_title_builds_a_usable_story() {
+        let story = new_story(draft("Первый день в школе", Some("1987-09-01")))
+            .expect("a Cyrillic title should be accepted");
+        assert_eq!(story.id, "1987-09-01-первый-день-в-школе");
+        assert_eq!(
+            story.relative_path(),
+            Path::new("timeline")
+                .join("1987")
+                .join("1987-09-01-первый-день-в-школе.md")
+        );
     }
 
     #[test]

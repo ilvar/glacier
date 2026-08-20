@@ -71,7 +71,7 @@
       font-size: 12px;
       font-weight: 650;
       padding: 6px 10px;
-      max-width: 46vw;
+      max-width: 42vw;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -107,7 +107,6 @@
       box-shadow: var(--shadow);
       min-width: 0;
     }
-    .card + .card { margin-top: 14px; }
     h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
     h2 { font-size: 18px; margin-bottom: 4px; }
     h3 { font-size: 15px; }
@@ -172,6 +171,9 @@
     .story-body { white-space: pre-wrap; margin: 7px 0; }
     .chips { display: flex; flex-wrap: wrap; gap: 5px; }
     .chip { background: var(--code); border-radius: 999px; padding: 3px 7px; font-size: 11px; color: var(--muted); }
+    /* Machine-written metadata is always labelled as such, here as much
+       as in the files themselves. */
+    .chip.by-model { border: 1px dashed var(--muted); }
     .question { font-size: 19px; line-height: 1.35; margin: 12px 0; }
     .notice { border-left: 3px solid var(--accent); padding-left: 12px; }
     .notice.danger { border-color: var(--danger); }
@@ -201,21 +203,22 @@
 <body>
 <header>
   <div class="bar">
-    <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="nav" aria-expanded="false">☰ Menu</button>
+    <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="nav" aria-expanded="false" data-i18n="nav.menu">☰ Menu</button>
     <div class="brand">legacy</div>
     <div class="spacer"></div>
-    <button class="archive-chip" id="archive-chip" type="button" title="Which archive this is writing to">archive…</button>
+    <button class="archive-chip" id="archive-chip" type="button">…</button>
   </div>
   <nav id="nav">
-    <a href="#add" data-view="add">Add a story</a>
-    <a href="#stories" data-view="stories">Stories</a>
-    <a href="#interview" data-view="interview">Interview</a>
-    <a href="#media" data-view="media">Media</a>
-    <a href="#ask" data-view="ask">Ask</a>
-    <a href="#maintenance" data-view="maintenance">Maintenance</a>
-    <a href="#seal" data-view="seal">Seal</a>
-    <a href="#unseal" data-view="unseal">Unseal</a>
-    <a href="#archive" data-view="archive">Archive</a>
+    <a href="#add" data-view="add" data-i18n="nav.add">Add a story</a>
+    <a href="#stories" data-view="stories" data-i18n="nav.stories">Stories</a>
+    <a href="#interview" data-view="interview" data-i18n="nav.interview">Interview</a>
+    <a href="#media" data-view="media" data-i18n="nav.media">Media</a>
+    <a href="#ask" data-view="ask" data-i18n="nav.ask">Ask</a>
+    <a href="#maintenance" data-view="maintenance" data-i18n="nav.maintenance">Maintenance</a>
+    <a href="#seal" data-view="seal" data-i18n="nav.seal">Seal</a>
+    <a href="#unseal" data-view="unseal" data-i18n="nav.unseal">Unseal</a>
+    <a href="#archive" data-view="archive" data-i18n="nav.archive">Archive</a>
+    <a href="#settings" data-view="settings" data-i18n="nav.settings">Settings</a>
   </nav>
 </header>
 
@@ -225,167 +228,199 @@
   <!-- The landing view: capturing a story is the thing this tool exists
        for, so it is what loads with no navigation and no setup. -->
   <section class="card view" id="view-add">
-    <h2>Add a story</h2>
-    <p class="muted">Saved straight into the archive as Markdown.</p>
+    <h2 data-i18n="add.heading">Add a story</h2>
+    <p class="muted" data-i18n="add.lead">Saved straight into the archive as Markdown.</p>
     <form id="story-form">
-      <div class="field"><label>Title<input name="title" required></label></div>
-      <div class="field"><label>Story<textarea name="body" placeholder="What happened?"></textarea></label></div>
+      <div class="field"><label><span data-i18n="field.title">Title</span><input name="title" data-i18n-ph="field.titlePlaceholder" placeholder="optional — a model can suggest one"></label></div>
+      <div class="field"><label><span data-i18n="field.story">Story</span><textarea name="body" data-i18n-ph="field.storyPlaceholder" placeholder="What happened?"></textarea></label></div>
       <div class="field">
         <div class="row">
-          <label>Date<input name="date" placeholder="YYYY-MM-DD, YYYY-MM, YYYY, YYYYs"></label>
-          <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
+          <label><span data-i18n="field.date">Date</span><input name="date" data-i18n-ph="field.datePlaceholder" placeholder="YYYY-MM-DD, YYYY-MM, YYYY, YYYYs"></label>
+          <label><span data-i18n="field.visibility">Visibility</span><select name="visibility">
+            <option value="family" data-i18n="vis.family">family</option>
+            <option value="public" data-i18n="vis.public">public</option>
+            <option value="executor-only" data-i18n="vis.executor">executor-only</option>
+          </select></label>
         </div>
       </div>
       <details>
-        <summary>People, places, tags</summary>
+        <summary data-i18n="add.moreFields">People, places, tags</summary>
         <div class="row">
-          <label>People<input name="people" placeholder="comma,separated"></label>
-          <label>Places<input name="places" placeholder="comma,separated"></label>
-          <label>Tags<input name="tags" placeholder="comma,separated"></label>
+          <label><span data-i18n="field.people">People</span><input name="people" data-i18n-ph="field.csvPlaceholder" placeholder="comma,separated"></label>
+          <label><span data-i18n="field.places">Places</span><input name="places" data-i18n-ph="field.csvPlaceholder" placeholder="comma,separated"></label>
+          <label><span data-i18n="field.tags">Tags</span><input name="tags" data-i18n-ph="field.csvPlaceholder" placeholder="comma,separated"></label>
         </div>
       </details>
-      <p></p>
-      <button type="submit">Save story</button>
+      <p class="muted" style="font-size:13px" data-i18n="add.enrichNote">With a model configured, empty title, tags and people are filled in from what you wrote. Anything you type yourself is kept as-is.</p>
+      <button type="submit" data-i18n="add.save">Save story</button>
     </form>
     <pre id="story-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-stories">
-    <h2>Stories</h2>
-    <p class="muted">Everything in the archive. Filters are optional.</p>
+    <h2 data-i18n="stories.heading">Stories</h2>
+    <p class="muted" data-i18n="stories.lead">Everything in the archive. Filters are optional.</p>
     <div class="row">
-      <label>Year<input id="filter-year" inputmode="numeric" placeholder="1994"></label>
-      <label>Person<input id="filter-person" placeholder="mary-oconnor"></label>
-      <label>Tag<input id="filter-tag" placeholder="school"></label>
-      <button id="refresh-stories" class="secondary" type="button">Refresh</button>
+      <label><span data-i18n="filter.year">Year</span><input id="filter-year" inputmode="numeric" placeholder="1994"></label>
+      <label><span data-i18n="filter.person">Person</span><input id="filter-person" placeholder="mary-oconnor"></label>
+      <label><span data-i18n="filter.tag">Tag</span><input id="filter-tag" data-i18n-ph="filter.tagPlaceholder" placeholder="school"></label>
+      <button id="refresh-stories" class="secondary" type="button" data-i18n="stories.refresh">Refresh</button>
     </div>
-    <div class="stories" id="stories"><span class="muted">Loading…</span></div>
+    <div class="stories" id="stories"><span class="muted" data-i18n="stories.loading">Loading…</span></div>
   </section>
 
   <section class="card view hidden" id="view-interview">
-    <h2>Interview</h2>
-    <p class="muted">Resumable; every answer is stored as a story before the session advances.</p>
+    <h2 data-i18n="interview.heading">Interview</h2>
+    <p class="muted" data-i18n="interview.lead">Resumable; every answer is stored as a story before the session advances.</p>
     <div class="row">
-      <label class="wide">Question bank<select id="bank"><option>Loading banks…</option></select></label>
-      <button id="start-interview" type="button">Start</button>
+      <label class="wide"><span data-i18n="interview.bank">Question bank</span><select id="bank"><option data-i18n="interview.loadingBanks">Loading banks…</option></select></label>
+      <button id="start-interview" type="button" data-i18n="interview.start">Start</button>
     </div>
     <div id="interview-active" class="hidden">
       <p class="muted" id="interview-meta"></p>
       <div class="question" id="interview-question"></div>
       <div class="chips" id="interview-followups"></div>
       <p></p>
-      <div class="field"><label>Answer<textarea id="interview-answer"></textarea></label></div>
+      <div class="field"><label><span data-i18n="interview.answer">Answer</span><textarea id="interview-answer"></textarea></label></div>
       <div class="row">
-        <label>Visibility<select id="interview-visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
-        <button id="answer-interview" type="button">Save answer</button>
-        <button id="skip-interview" class="secondary" type="button">Skip</button>
+        <label><span data-i18n="field.visibility">Visibility</span><select id="interview-visibility">
+          <option value="family" data-i18n="vis.family">family</option>
+          <option value="public" data-i18n="vis.public">public</option>
+          <option value="executor-only" data-i18n="vis.executor">executor-only</option>
+        </select></label>
+        <button id="answer-interview" type="button" data-i18n="interview.saveAnswer">Save answer</button>
+        <button id="skip-interview" class="secondary" type="button" data-i18n="interview.skip">Skip</button>
       </div>
     </div>
     <details>
-      <summary>Resume an earlier session</summary>
+      <summary data-i18n="interview.resumeSummary">Resume an earlier session</summary>
       <div class="row">
-        <label>Session id<input id="resume-id" placeholder="session id"></label>
-        <button id="resume-interview" class="secondary" type="button">Resume</button>
+        <label><span data-i18n="interview.sessionId">Session id</span><input id="resume-id" data-i18n-ph="interview.sessionId" placeholder="session id"></label>
+        <button id="resume-interview" class="secondary" type="button" data-i18n="interview.resume">Resume</button>
       </div>
     </details>
     <pre id="interview-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-media">
-    <h2>Media ingest</h2>
-    <p class="muted">Copies recognized files from a directory on the server; originals are not modified.</p>
+    <h2 data-i18n="media.heading">Media ingest</h2>
+    <p class="muted" data-i18n="media.lead">Copies recognized files from a directory on the server; originals are not modified.</p>
     <form id="media-form">
-      <div class="field"><label>Source directory<input name="source" required></label></div>
+      <div class="field"><label><span data-i18n="media.source">Source directory</span><input name="source" required></label></div>
       <div class="row">
-        <label>Date<input name="date" placeholder="optional"></label>
-        <label>Visibility<select name="visibility"><option value="family">family</option><option value="public">public</option><option value="executor-only">executor-only</option></select></label>
+        <label><span data-i18n="field.date">Date</span><input name="date" data-i18n-ph="media.optional" placeholder="optional"></label>
+        <label><span data-i18n="field.visibility">Visibility</span><select name="visibility">
+          <option value="family" data-i18n="vis.family">family</option>
+          <option value="public" data-i18n="vis.public">public</option>
+          <option value="executor-only" data-i18n="vis.executor">executor-only</option>
+        </select></label>
       </div>
       <p></p>
-      <label class="check"><input name="date_from_exif" type="checkbox"> Try capture date via ffprobe</label>
+      <label class="check"><input name="date_from_exif" type="checkbox"> <span data-i18n="media.exif">Try capture date via ffprobe</span></label>
       <p></p>
-      <button type="submit">Ingest media</button>
+      <button type="submit" data-i18n="media.ingest">Ingest media</button>
     </form>
     <pre id="media-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-ask">
-    <h2>Ask the replica</h2>
-    <p class="muted">Uses the configured OpenAI-compatible endpoint and only answers from stored stories.</p>
+    <h2 data-i18n="ask.heading">Ask the replica</h2>
+    <p class="muted" data-i18n="ask.lead">Uses the configured OpenAI-compatible endpoint and only answers from stored stories.</p>
     <form id="ask-form">
-      <div class="field"><label>Question<textarea name="question" required placeholder="What did you do after school?"></textarea></label></div>
-      <button type="submit">Ask</button>
+      <div class="field"><label><span data-i18n="ask.question">Question</span><textarea name="question" required data-i18n-ph="ask.questionPlaceholder" placeholder="What did you do after school?"></textarea></label></div>
+      <button type="submit" data-i18n="ask.submit">Ask</button>
     </form>
     <pre id="ask-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-maintenance">
-    <h2>Maintenance</h2>
-    <p class="muted">Derived state is rebuildable. Verification checks the manifest against disk.</p>
+    <h2 data-i18n="maintenance.heading">Maintenance</h2>
+    <p class="muted" data-i18n="maintenance.lead">Derived state is rebuildable. Verification checks the manifest against disk.</p>
     <div class="row">
-      <button id="verify" type="button">Verify</button>
-      <button id="build" class="secondary" type="button">Rebuild timeline + index</button>
+      <button id="verify" type="button" data-i18n="maintenance.verify">Verify</button>
+      <button id="build" class="secondary" type="button" data-i18n="maintenance.rebuild">Rebuild timeline + index</button>
     </div>
-    <details>
-      <summary>LLM tag suggestions</summary>
-      <p class="muted">Suggestions are a preview unless you explicitly apply them.</p>
+    <details open>
+      <summary data-i18n="enrich.summary">Fill in missing details with a model</summary>
+      <p class="muted" data-i18n="enrich.lead">Looks at stories with no tags or no people and proposes them from the text. Only ever fills blanks — it never rewrites what you wrote.</p>
       <div class="row">
-        <button id="tag-preview" class="secondary" type="button">Preview tags</button>
-        <button id="tag-apply" type="button">Apply suggested tags</button>
+        <button id="enrich-preview" class="secondary" type="button" data-i18n="enrich.preview">Preview changes</button>
+        <button id="enrich-apply" type="button" data-i18n="enrich.apply">Enrich stories</button>
+      </div>
+    </details>
+    <details>
+      <summary data-i18n="tags.summary">LLM tag suggestions</summary>
+      <p class="muted" data-i18n="tags.lead">Suggestions are a preview unless you explicitly apply them.</p>
+      <div class="row">
+        <button id="tag-preview" class="secondary" type="button" data-i18n="tags.preview">Preview tags</button>
+        <button id="tag-apply" type="button" data-i18n="tags.apply">Apply suggested tags</button>
       </div>
     </details>
     <pre id="maintenance-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-seal">
-    <h2>Seal</h2>
-    <p class="notice danger"><strong>Shares are shown once.</strong> Copy and distribute them before leaving or refreshing this page. The archive does not retain them.</p>
-    <label class="check"><input id="tier-family" type="checkbox" checked> family</label>
+    <h2 data-i18n="seal.heading">Seal</h2>
+    <p class="notice danger"><strong data-i18n="seal.warnStrong">Shares are shown once.</strong> <span data-i18n="seal.warn">Copy and distribute them before leaving or refreshing this page. The archive does not retain them.</span></p>
+    <label class="check"><input id="tier-family" type="checkbox" checked> <span data-i18n="vis.family">family</span></label>
     <p></p>
-    <label class="check"><input id="tier-executor" type="checkbox" checked> executor-only</label>
+    <label class="check"><input id="tier-executor" type="checkbox" checked> <span data-i18n="vis.executor">executor-only</span></label>
     <p></p>
-    <label class="check"><input id="plaintext-escrow" type="checkbox"> plaintext family escrow</label>
+    <label class="check"><input id="plaintext-escrow" type="checkbox"> <span data-i18n="seal.escrow">plaintext family escrow</span></label>
     <p></p>
-    <button id="seal" class="danger" type="button">Seal selected tiers</button>
+    <button id="seal" class="danger" type="button" data-i18n="seal.submit">Seal selected tiers</button>
     <pre id="seal-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-unseal">
-    <h2>Unseal</h2>
-    <p class="muted">Paste enough SLIP-0039 shares for one tier, one complete share per line.</p>
+    <h2 data-i18n="unseal.heading">Unseal</h2>
+    <p class="muted" data-i18n="unseal.lead">Paste enough SLIP-0039 shares for one tier, one complete share per line.</p>
     <form id="unseal-form">
-      <div class="field"><label>Shares<textarea name="shares" required></textarea></label></div>
-      <div class="field"><label>Output directory<input name="output" placeholder="optional; defaults inside archive"></label></div>
-      <button type="submit">Unseal</button>
+      <div class="field"><label><span data-i18n="unseal.shares">Shares</span><textarea name="shares" required></textarea></label></div>
+      <div class="field"><label><span data-i18n="unseal.output">Output directory</span><input name="output" data-i18n-ph="unseal.outputPlaceholder" placeholder="optional; defaults inside archive"></label></div>
+      <button type="submit" data-i18n="unseal.submit">Unseal</button>
     </form>
     <pre id="unseal-result" class="hidden"></pre>
   </section>
 
   <section class="card view hidden" id="view-archive">
-    <h2>Archive</h2>
-    <p class="muted" id="archive-summary">Loading…</p>
+    <h2 data-i18n="archive.heading">Archive</h2>
+    <p class="muted" id="archive-summary" data-i18n="common.loading">Loading…</p>
     <details>
-      <summary>Use a different archive</summary>
-      <p class="muted">Leave blank to use the server's default archive, which is created automatically on first use.</p>
+      <summary data-i18n="archive.switchSummary">Use a different archive</summary>
+      <p class="muted" data-i18n="archive.switchLead">Leave blank to use the server's default archive, which is created automatically on first use.</p>
       <div class="row">
-        <label>Archive path<input id="archive-override" placeholder="/home/me/my-archive"></label>
-        <button id="use-archive" type="button">Use</button>
-        <button id="clear-archive" class="secondary" type="button">Use default</button>
+        <label><span data-i18n="archive.path">Archive path</span><input id="archive-override" placeholder="/home/me/my-archive"></label>
+        <button id="use-archive" type="button" data-i18n="archive.use">Use</button>
+        <button id="clear-archive" class="secondary" type="button" data-i18n="archive.useDefault">Use default</button>
       </div>
     </details>
     <details>
-      <summary>Create a new archive</summary>
+      <summary data-i18n="archive.createSummary">Create a new archive</summary>
       <form id="init-form">
-        <div class="field"><label>Path<input name="path" required placeholder="/home/me/my-archive"></label></div>
-        <div class="field"><label>Subject<input name="subject" required placeholder="Jane Doe"></label></div>
+        <div class="field"><label><span data-i18n="archive.path">Path</span><input name="path" required placeholder="/home/me/my-archive"></label></div>
+        <div class="field"><label><span data-i18n="archive.subject">Subject</span><input name="subject" required placeholder="Jane Doe"></label></div>
         <div class="row">
-          <label>Threshold<input name="threshold" type="number" min="1" value="3"></label>
-          <label>Shares<input name="shares" type="number" min="1" value="5"></label>
+          <label><span data-i18n="archive.threshold">Threshold</span><input name="threshold" type="number" min="1" value="3"></label>
+          <label><span data-i18n="archive.shares">Shares</span><input name="shares" type="number" min="1" value="5"></label>
         </div>
         <p></p>
-        <button type="submit">Create archive</button>
+        <button type="submit" data-i18n="archive.create">Create archive</button>
       </form>
     </details>
     <pre id="archive-result" class="hidden"></pre>
+  </section>
+
+  <section class="card view hidden" id="view-settings">
+    <h2 data-i18n="settings.heading">Settings</h2>
+    <p class="muted" data-i18n="settings.lead">Kept in this browser only. Nothing here is written into the archive.</p>
+    <div class="field">
+      <label><span data-i18n="settings.language">Language</span><select id="language">
+        <option value="en">English</option>
+        <option value="ru">Русский</option>
+      </select></label>
+    </div>
+    <p class="muted" data-i18n="settings.languageNote">Changes the interface only. Your stories stay in whatever language you wrote them.</p>
   </section>
 </main>
 
@@ -394,10 +429,290 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const VIEWS = ['add', 'stories', 'interview', 'media', 'ask', 'maintenance', 'seal', 'unseal', 'archive'];
+  const VIEWS = ['add', 'stories', 'interview', 'media', 'ask', 'maintenance', 'seal', 'unseal', 'archive', 'settings'];
   const DEFAULT_VIEW = 'add';
   let sessionId = null;
   let banksLoaded = false;
+
+  /* ------------------------------ i18n ------------------------------
+     English is the source text and the fallback: a missing Russian key
+     shows English rather than a blank or a raw key, so a half-finished
+     translation degrades to something still usable. */
+
+  const STRINGS = {
+    en: {
+      'nav.menu': '☰ Menu',
+      'nav.add': 'Add a story', 'nav.stories': 'Stories', 'nav.interview': 'Interview',
+      'nav.media': 'Media', 'nav.ask': 'Ask', 'nav.maintenance': 'Maintenance',
+      'nav.seal': 'Seal', 'nav.unseal': 'Unseal', 'nav.archive': 'Archive',
+      'nav.settings': 'Settings',
+
+      'common.loading': 'Loading…',
+
+      'add.heading': 'Add a story',
+      'add.lead': 'Saved straight into the archive as Markdown.',
+      'add.moreFields': 'People, places, tags',
+      'add.save': 'Save story',
+      'add.enrichNote': 'With a model configured, empty title, tags and people are filled in from what you wrote. Anything you type yourself is kept as-is.',
+      'add.saved': 'Saved {path}',
+      'add.savedEnriched': 'Saved {path} — the model filled in: {fields}',
+      'add.enrichFailed': 'Saved {path}. The model could not be reached, so nothing was filled in: {error}',
+
+      'field.title': 'Title',
+      'field.titlePlaceholder': 'optional — a model can suggest one',
+      'field.story': 'Story',
+      'field.storyPlaceholder': 'What happened?',
+      'field.date': 'Date',
+      'field.datePlaceholder': 'YYYY-MM-DD, YYYY-MM, YYYY, YYYYs',
+      'field.visibility': 'Visibility',
+      'field.people': 'People', 'field.places': 'Places', 'field.tags': 'Tags',
+      'field.csvPlaceholder': 'comma,separated',
+      'vis.family': 'family', 'vis.public': 'public', 'vis.executor': 'executor-only',
+
+      'stories.heading': 'Stories',
+      'stories.lead': 'Everything in the archive. Filters are optional.',
+      'stories.refresh': 'Refresh',
+      'stories.loading': 'Loading…',
+      'stories.empty': 'No stories yet. Add one from the "Add a story" page.',
+      'stories.none': 'No stories matched.',
+      'stories.undated': 'undated',
+      'stories.byModel': 'tags by {model}',
+      'filter.year': 'Year', 'filter.person': 'Person', 'filter.tag': 'Tag',
+      'filter.tagPlaceholder': 'school',
+
+      'interview.heading': 'Interview',
+      'interview.lead': 'Resumable; every answer is stored as a story before the session advances.',
+      'interview.bank': 'Question bank', 'interview.loadingBanks': 'Loading banks…',
+      'interview.start': 'Start', 'interview.answer': 'Answer',
+      'interview.saveAnswer': 'Save answer', 'interview.skip': 'Skip',
+      'interview.resumeSummary': 'Resume an earlier session',
+      'interview.sessionId': 'Session id', 'interview.resume': 'Resume',
+      'interview.complete': 'Interview complete.',
+      'interview.needSession': 'Start or resume an interview first.',
+      'interview.needAnswer': 'Enter an answer.',
+      'interview.needId': 'Enter a session id.',
+      'interview.meta': '{bank} · {status} · {answered} answered · {skipped} skipped',
+
+      'media.heading': 'Media ingest',
+      'media.lead': 'Copies recognized files from a directory on the server; originals are not modified.',
+      'media.source': 'Source directory', 'media.optional': 'optional',
+      'media.exif': 'Try capture date via ffprobe', 'media.ingest': 'Ingest media',
+
+      'ask.heading': 'Ask the replica',
+      'ask.lead': 'Uses the configured OpenAI-compatible endpoint and only answers from stored stories.',
+      'ask.question': 'Question',
+      'ask.questionPlaceholder': 'What did you do after school?',
+      'ask.submit': 'Ask',
+      'ask.answer': 'Answer', 'ask.cited': 'Cited stories',
+
+      'maintenance.heading': 'Maintenance',
+      'maintenance.lead': 'Derived state is rebuildable. Verification checks the manifest against disk.',
+      'maintenance.verify': 'Verify', 'maintenance.rebuild': 'Rebuild timeline + index',
+
+      'enrich.summary': 'Fill in missing details with a model',
+      'enrich.lead': 'Looks at stories with no tags or no people and proposes them from the text. Only ever fills blanks — it never rewrites what you wrote.',
+      'enrich.preview': 'Preview changes', 'enrich.apply': 'Enrich stories',
+      'enrich.working': 'Reading your stories…',
+      'enrich.none': 'Nothing to fill in — every story already has tags and people.',
+      'enrich.previewed': '{count} stories would change. Press "Enrich stories" to write them.',
+      'enrich.applied': 'Filled in {count} stories.',
+
+      'tags.summary': 'LLM tag suggestions',
+      'tags.lead': 'Suggestions are a preview unless you explicitly apply them.',
+      'tags.preview': 'Preview tags', 'tags.apply': 'Apply suggested tags',
+
+      'seal.heading': 'Seal',
+      'seal.warnStrong': 'Shares are shown once.',
+      'seal.warn': 'Copy and distribute them before leaving or refreshing this page. The archive does not retain them.',
+      'seal.escrow': 'plaintext family escrow',
+      'seal.submit': 'Seal selected tiers',
+      'seal.needTier': 'Select at least one tier.',
+      'seal.confirm': 'Seal {tiers} now? Newly generated shares must be copied before this page is closed.',
+
+      'unseal.heading': 'Unseal',
+      'unseal.lead': 'Paste enough SLIP-0039 shares for one tier, one complete share per line.',
+      'unseal.shares': 'Shares', 'unseal.output': 'Output directory',
+      'unseal.outputPlaceholder': 'optional; defaults inside archive',
+      'unseal.submit': 'Unseal',
+
+      'archive.heading': 'Archive',
+      'archive.switchSummary': 'Use a different archive',
+      'archive.switchLead': "Leave blank to use the server's default archive, which is created automatically on first use.",
+      'archive.path': 'Archive path', 'archive.use': 'Use', 'archive.useDefault': 'Use default',
+      'archive.createSummary': 'Create a new archive',
+      'archive.subject': 'Subject', 'archive.threshold': 'Threshold',
+      'archive.shares': 'Shares', 'archive.create': 'Create archive',
+      'archive.switched': 'Switched archive.',
+      'archive.usingDefault': 'Using the server default archive.',
+      'archive.summary': '{subject} — {count} — {root}',
+      'archive.storyCount': '{n} stories', 'archive.storyCountOne': '1 story',
+      'archive.unreadable': 'Could not read the archive: {error}',
+
+      'settings.heading': 'Settings',
+      'settings.lead': 'Kept in this browser only. Nothing here is written into the archive.',
+      'settings.language': 'Language',
+      'settings.languageNote': 'Changes the interface only. Your stories stay in whatever language you wrote them.',
+    },
+    ru: {
+      'nav.menu': '☰ Меню',
+      'nav.add': 'Добавить историю', 'nav.stories': 'Истории', 'nav.interview': 'Интервью',
+      'nav.media': 'Медиа', 'nav.ask': 'Спросить', 'nav.maintenance': 'Обслуживание',
+      'nav.seal': 'Запечатать', 'nav.unseal': 'Распечатать', 'nav.archive': 'Архив',
+      'nav.settings': 'Настройки',
+
+      'common.loading': 'Загрузка…',
+
+      'add.heading': 'Добавить историю',
+      'add.lead': 'Сохраняется прямо в архив в формате Markdown.',
+      'add.moreFields': 'Люди, места, метки',
+      'add.save': 'Сохранить историю',
+      'add.enrichNote': 'Если модель настроена, пустые заголовок, метки и люди будут заполнены по тексту. Всё, что вы написали сами, останется без изменений.',
+      'add.saved': 'Сохранено: {path}',
+      'add.savedEnriched': 'Сохранено: {path} — модель заполнила: {fields}',
+      'add.enrichFailed': 'Сохранено: {path}. Модель недоступна, ничего не заполнено: {error}',
+
+      'field.title': 'Заголовок',
+      'field.titlePlaceholder': 'необязательно — модель может предложить',
+      'field.story': 'История',
+      'field.storyPlaceholder': 'Что произошло?',
+      'field.date': 'Дата',
+      'field.datePlaceholder': 'ГГГГ-ММ-ДД, ГГГГ-ММ, ГГГГ, ГГГГ-е',
+      'field.visibility': 'Видимость',
+      'field.people': 'Люди', 'field.places': 'Места', 'field.tags': 'Метки',
+      'field.csvPlaceholder': 'через,запятую',
+      'vis.family': 'семья', 'vis.public': 'открытая', 'vis.executor': 'только душеприказчик',
+
+      'stories.heading': 'Истории',
+      'stories.lead': 'Всё, что есть в архиве. Фильтры необязательны.',
+      'stories.refresh': 'Обновить',
+      'stories.loading': 'Загрузка…',
+      'stories.empty': 'Историй пока нет. Добавьте первую на странице «Добавить историю».',
+      'stories.none': 'Ничего не найдено.',
+      'stories.undated': 'без даты',
+      'stories.byModel': 'метки от {model}',
+      'filter.year': 'Год', 'filter.person': 'Человек', 'filter.tag': 'Метка',
+      'filter.tagPlaceholder': 'школа',
+
+      'interview.heading': 'Интервью',
+      'interview.lead': 'Можно прервать и продолжить: каждый ответ сохраняется как история до перехода к следующему вопросу.',
+      'interview.bank': 'Набор вопросов', 'interview.loadingBanks': 'Загрузка наборов…',
+      'interview.start': 'Начать', 'interview.answer': 'Ответ',
+      'interview.saveAnswer': 'Сохранить ответ', 'interview.skip': 'Пропустить',
+      'interview.resumeSummary': 'Продолжить прошлую сессию',
+      'interview.sessionId': 'Идентификатор сессии', 'interview.resume': 'Продолжить',
+      'interview.complete': 'Интервью завершено.',
+      'interview.needSession': 'Сначала начните или продолжите интервью.',
+      'interview.needAnswer': 'Введите ответ.',
+      'interview.needId': 'Введите идентификатор сессии.',
+      'interview.meta': '{bank} · {status} · отвечено: {answered} · пропущено: {skipped}',
+
+      'media.heading': 'Импорт медиа',
+      'media.lead': 'Копирует подходящие файлы из папки на сервере; оригиналы не изменяются.',
+      'media.source': 'Исходная папка', 'media.optional': 'необязательно',
+      'media.exif': 'Определить дату съёмки через ffprobe', 'media.ingest': 'Импортировать',
+
+      'ask.heading': 'Спросить у реплики',
+      'ask.lead': 'Использует настроенный OpenAI-совместимый сервис и отвечает только по сохранённым историям.',
+      'ask.question': 'Вопрос',
+      'ask.questionPlaceholder': 'Чем вы занимались после школы?',
+      'ask.submit': 'Спросить',
+      'ask.answer': 'Ответ', 'ask.cited': 'Использованные истории',
+
+      'maintenance.heading': 'Обслуживание',
+      'maintenance.lead': 'Производные файлы можно пересобрать. Проверка сверяет манифест с диском.',
+      'maintenance.verify': 'Проверить', 'maintenance.rebuild': 'Пересобрать хронологию и индекс',
+
+      'enrich.summary': 'Заполнить недостающее с помощью модели',
+      'enrich.lead': 'Находит истории без меток или без людей и предлагает их по тексту. Заполняет только пустое — никогда не переписывает написанное вами.',
+      'enrich.preview': 'Посмотреть изменения', 'enrich.apply': 'Заполнить истории',
+      'enrich.working': 'Читаю ваши истории…',
+      'enrich.none': 'Заполнять нечего — у всех историй уже есть метки и люди.',
+      'enrich.previewed': 'Изменится историй: {count}. Нажмите «Заполнить истории», чтобы записать.',
+      'enrich.applied': 'Заполнено историй: {count}.',
+
+      'tags.summary': 'Предложения меток от модели',
+      'tags.lead': 'Это предварительный просмотр, пока вы не примените изменения.',
+      'tags.preview': 'Посмотреть метки', 'tags.apply': 'Применить метки',
+
+      'seal.heading': 'Запечатать',
+      'seal.warnStrong': 'Доли показываются один раз.',
+      'seal.warn': 'Скопируйте и раздайте их до того, как закроете или обновите страницу. Архив их не хранит.',
+      'seal.escrow': 'открытая копия для семьи',
+      'seal.submit': 'Запечатать выбранные уровни',
+      'seal.needTier': 'Выберите хотя бы один уровень.',
+      'seal.confirm': 'Запечатать {tiers}? Новые доли нужно скопировать до закрытия страницы.',
+
+      'unseal.heading': 'Распечатать',
+      'unseal.lead': 'Вставьте достаточное число долей SLIP-0039 для одного уровня, по одной доле в строке.',
+      'unseal.shares': 'Доли', 'unseal.output': 'Папка для результата',
+      'unseal.outputPlaceholder': 'необязательно; по умолчанию внутри архива',
+      'unseal.submit': 'Распечатать',
+
+      'archive.heading': 'Архив',
+      'archive.switchSummary': 'Использовать другой архив',
+      'archive.switchLead': 'Оставьте пустым, чтобы использовать архив сервера по умолчанию — он создаётся автоматически при первом обращении.',
+      'archive.path': 'Путь к архиву', 'archive.use': 'Использовать', 'archive.useDefault': 'По умолчанию',
+      'archive.createSummary': 'Создать новый архив',
+      'archive.subject': 'Чья жизнь', 'archive.threshold': 'Порог',
+      'archive.shares': 'Долей', 'archive.create': 'Создать архив',
+      'archive.switched': 'Архив переключён.',
+      'archive.usingDefault': 'Используется архив сервера по умолчанию.',
+      'archive.summary': '{subject} — {count} — {root}',
+      'archive.storyCount': 'историй: {n}', 'archive.storyCountOne': '1 история',
+      'archive.unreadable': 'Не удалось прочитать архив: {error}',
+
+      'settings.heading': 'Настройки',
+      'settings.lead': 'Хранится только в этом браузере. В архив ничего из этого не записывается.',
+      'settings.language': 'Язык',
+      'settings.languageNote': 'Меняет только интерфейс. Ваши истории остаются на том языке, на котором вы их написали.',
+    },
+  };
+
+  function language() {
+    const stored = localStorage.getItem('legacy.language');
+    if (stored && STRINGS[stored]) return stored;
+    // First visit: follow the browser rather than assuming English.
+    return (navigator.language || 'en').toLowerCase().startsWith('ru') ? 'ru' : 'en';
+  }
+
+  function t(key, values) {
+    const lang = language();
+    let text = (STRINGS[lang] && STRINGS[lang][key]);
+    if (text === undefined) text = STRINGS.en[key];
+    if (text === undefined) return key;
+    if (values) {
+      for (const [name, value] of Object.entries(values)) {
+        text = text.split('{' + name + '}').join(String(value));
+      }
+    }
+    return text;
+  }
+
+  function applyLanguage() {
+    const lang = language();
+    document.documentElement.lang = lang;
+    for (const el of document.querySelectorAll('[data-i18n]')) {
+      el.textContent = t(el.dataset.i18n);
+    }
+    for (const el of document.querySelectorAll('[data-i18n-ph]')) {
+      el.placeholder = t(el.dataset.i18nPh);
+    }
+    $('language').value = lang;
+  }
+
+  function storyCount(n) {
+    return n === 1 ? t('archive.storyCountOne') : t('archive.storyCount', { n });
+  }
+
+  /// The stored value stays canonical ("executor-only"); only the label
+  /// a person reads is translated.
+  const VISIBILITY_KEYS = {
+    'family': 'vis.family', 'public': 'vis.public', 'executor-only': 'vis.executor'
+  };
+  function visibilityLabel(value) {
+    const key = VISIBILITY_KEYS[value];
+    return key ? t(key) : value;
+  }
 
   /* ---------- archive selection ----------
      Empty means "whatever archive the server resolved for itself". The
@@ -423,13 +738,8 @@
     return params;
   }
 
-  function csv(value) {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
-  }
-
-  function lines(value) {
-    return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
-  }
+  const csv = (value) => value.split(',').map((item) => item.trim()).filter(Boolean);
+  const lines = (value) => value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
 
   function show(id, value) {
     const el = $(id);
@@ -449,7 +759,7 @@
   }
 
   function fail(id, error) {
-    show(id, `Error: ${error.message}`);
+    show(id, `${error.message}`);
     banner(error.message, true);
   }
 
@@ -462,7 +772,7 @@
     try {
       data = await response.json();
     } catch (_) {
-      throw new Error(`HTTP ${response.status}: invalid JSON response`);
+      throw new Error(`HTTP ${response.status}`);
     }
     if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
     banner('');
@@ -496,46 +806,53 @@
     if (view === 'archive') loadArchive();
   }
 
-  function currentView() {
-    return (location.hash || '').replace(/^#/, '') || DEFAULT_VIEW;
-  }
-
+  const currentView = () => (location.hash || '').replace(/^#/, '') || DEFAULT_VIEW;
   window.addEventListener('hashchange', () => showView(currentView()));
 
   $('menu-toggle').addEventListener('click', () => {
-    const nav = $('nav');
-    const open = nav.classList.toggle('open');
+    const open = $('nav').classList.toggle('open');
     $('menu-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
   });
 
   $('archive-chip').addEventListener('click', () => { location.hash = '#archive'; });
+
+  /* ---------- settings ---------- */
+
+  $('language').addEventListener('change', (event) => {
+    localStorage.setItem('legacy.language', event.target.value);
+    applyLanguage();
+    // Re-render anything already on screen in the new language.
+    loadArchive();
+    if (currentView() === 'stories') loadStories().catch(() => {});
+  });
 
   /* ---------- archive ---------- */
 
   async function loadArchive() {
     try {
       const info = await api(`/archive?${archiveParams().toString()}`);
-      const stories = info.story_count === 1 ? '1 story' : `${info.story_count} stories`;
       $('archive-chip').textContent = info.subject;
-      $('archive-summary').textContent = `${info.subject} — ${stories} — ${info.root}`;
+      $('archive-summary').textContent = t('archive.summary', {
+        subject: info.subject, count: storyCount(info.story_count), root: info.root
+      });
       $('archive-override').value = archiveOverride();
     } catch (error) {
       $('archive-chip').textContent = 'archive?';
-      $('archive-summary').textContent = `Could not read the archive: ${error.message}`;
+      $('archive-summary').textContent = t('archive.unreadable', { error: error.message });
     }
   }
 
   $('use-archive').addEventListener('click', () => action($('use-archive'), 'archive-result', async () => {
     localStorage.setItem('legacy.archive', $('archive-override').value.trim());
     await loadArchive();
-    show('archive-result', 'Switched archive.');
+    show('archive-result', t('archive.switched'));
   }));
 
   $('clear-archive').addEventListener('click', () => action($('clear-archive'), 'archive-result', async () => {
     localStorage.removeItem('legacy.archive');
     $('archive-override').value = '';
     await loadArchive();
-    show('archive-result', 'Using the server default archive.');
+    show('archive-result', t('archive.usingDefault'));
   }));
 
   $('init-form').addEventListener('submit', (event) => {
@@ -560,9 +877,9 @@
 
   /* ---------- stories ---------- */
 
-  function addChip(parent, text) {
+  function addChip(parent, text, byModel) {
     const chip = document.createElement('span');
-    chip.className = 'chip';
+    chip.className = byModel ? 'chip by-model' : 'chip';
     chip.textContent = text;
     parent.appendChild(chip);
   }
@@ -573,7 +890,7 @@
     if (!stories.length) {
       const empty = document.createElement('span');
       empty.className = 'muted';
-      empty.textContent = 'No stories yet. Add one from the "Add a story" page.';
+      empty.textContent = t('stories.none');
       root.appendChild(empty);
       return;
     }
@@ -586,15 +903,19 @@
       title.textContent = story.title;
       const date = document.createElement('span');
       date.className = 'story-date';
-      date.textContent = story.date || 'undated';
+      date.textContent = story.date || t('stories.undated');
       head.append(title, date);
       const body = document.createElement('div');
       body.className = 'story-body';
       body.textContent = story.body || '';
       const chips = document.createElement('div');
       chips.className = 'chips';
-      addChip(chips, story.visibility);
-      for (const tag of story.tags || []) addChip(chips, `#${tag}`);
+      addChip(chips, visibilityLabel(story.visibility));
+      for (const tag of story.tags || []) addChip(chips, `#${tag}`, Boolean(story.tags_generated_by));
+      // Never let a model's words pass for the subject's own.
+      if (story.tags_generated_by) {
+        addChip(chips, t('stories.byModel', { model: story.tags_generated_by }), true);
+      }
       item.append(head, body, chips);
       root.appendChild(item);
     }
@@ -628,7 +949,15 @@
           visibility: String(data.get('visibility'))
         }))
       });
-      show('story-result', `Saved ${result.path || result.id || ''}`.trim());
+      const path = result.path || result.id || '';
+      const filled = result.enriched_fields || [];
+      if (result.enrich_error) {
+        show('story-result', t('add.enrichFailed', { path, error: result.enrich_error }));
+      } else if (filled.length) {
+        show('story-result', t('add.savedEnriched', { path, fields: filled.join(', ') }));
+      } else {
+        show('story-result', t('add.saved', { path }));
+      }
       form.reset();
       form.querySelector('[name=title]').focus();
       loadArchive();
@@ -646,7 +975,7 @@
         method: 'POST',
         body: JSON.stringify(withArchive({ question: String(data.get('question')).trim() }))
       });
-      show('ask-result', `Answer:\n${result.answer}\n\nCited stories:\n${(result.cited_story_ids || []).join('\n')}`);
+      show('ask-result', `${t('ask.answer')}:\n${result.answer}\n\n${t('ask.cited')}:\n${(result.cited_story_ids || []).join('\n')}`);
     });
   });
 
@@ -674,11 +1003,14 @@
     sessionId = session.session_id;
     $('resume-id').value = sessionId;
     $('interview-active').classList.remove('hidden');
-    $('interview-meta').textContent = `${session.bank} · ${session.status} · ${session.answered.length} answered · ${session.skipped.length} skipped · ${sessionId}`;
+    $('interview-meta').textContent = t('interview.meta', {
+      bank: session.bank, status: session.status,
+      answered: session.answered.length, skipped: session.skipped.length
+    }) + ' · ' + sessionId;
     $('interview-followups').replaceChildren();
     $('interview-answer').value = '';
     if (!session.next_question) {
-      $('interview-question').textContent = 'Interview complete.';
+      $('interview-question').textContent = t('interview.complete');
       $('answer-interview').disabled = true;
       $('skip-interview').disabled = true;
       return;
@@ -691,22 +1023,20 @@
 
   $('start-interview').addEventListener('click', () => action($('start-interview'), 'interview-result', async () => {
     renderInterview(await api('/interviews', {
-      method: 'POST',
-      body: JSON.stringify(withArchive({ bank: $('bank').value }))
+      method: 'POST', body: JSON.stringify(withArchive({ bank: $('bank').value }))
     }));
   }));
 
   $('resume-interview').addEventListener('click', () => action($('resume-interview'), 'interview-result', async () => {
     const id = $('resume-id').value.trim();
-    if (!id) throw new Error('Enter a session id.');
-    const params = archiveParams();
-    renderInterview(await api(`/interviews/${encodeURIComponent(id)}?${params.toString()}`));
+    if (!id) throw new Error(t('interview.needId'));
+    renderInterview(await api(`/interviews/${encodeURIComponent(id)}?${archiveParams().toString()}`));
   }));
 
   $('answer-interview').addEventListener('click', () => action($('answer-interview'), 'interview-result', async () => {
-    if (!sessionId) throw new Error('Start or resume an interview first.');
+    if (!sessionId) throw new Error(t('interview.needSession'));
     const answer = $('interview-answer').value.trim();
-    if (!answer) throw new Error('Enter an answer.');
+    if (!answer) throw new Error(t('interview.needAnswer'));
     renderInterview(await api(`/interviews/${encodeURIComponent(sessionId)}/answer`, {
       method: 'POST',
       body: JSON.stringify(withArchive({ answer, visibility: $('interview-visibility').value }))
@@ -715,10 +1045,9 @@
   }));
 
   $('skip-interview').addEventListener('click', () => action($('skip-interview'), 'interview-result', async () => {
-    if (!sessionId) throw new Error('Start or resume an interview first.');
+    if (!sessionId) throw new Error(t('interview.needSession'));
     renderInterview(await api(`/interviews/${encodeURIComponent(sessionId)}/skip`, {
-      method: 'POST',
-      body: JSON.stringify(withArchive({}))
+      method: 'POST', body: JSON.stringify(withArchive({}))
     }));
   }));
 
@@ -729,7 +1058,7 @@
     const form = event.currentTarget;
     action(event.submitter, 'media-result', async () => {
       const data = new FormData(form);
-      const result = await api('/media/ingest', {
+      show('media-result', await api('/media/ingest', {
         method: 'POST',
         body: JSON.stringify(withArchive({
           source: String(data.get('source')).trim(),
@@ -737,8 +1066,7 @@
           visibility: String(data.get('visibility')),
           date_from_exif: data.get('date_from_exif') === 'on'
         }))
-      });
-      show('media-result', result);
+      }));
     });
   });
 
@@ -750,15 +1078,33 @@
 
   $('build').addEventListener('click', () => action($('build'), 'maintenance-result', async () => {
     show('maintenance-result', await api('/timeline/build', {
-      method: 'POST',
-      body: JSON.stringify(withArchive({}))
+      method: 'POST', body: JSON.stringify(withArchive({}))
     }));
   }));
 
+  /* Enrichment can take a while — it is one model round-trip per story —
+     so say what is happening rather than leaving a dead button. */
+  async function enrich(apply) {
+    show('maintenance-result', t('enrich.working'));
+    const result = await api('/enrich', {
+      method: 'POST', body: JSON.stringify(withArchive({ apply }))
+    });
+    const count = result.changed || 0;
+    let summary;
+    if (!count) summary = t('enrich.none');
+    else summary = apply ? t('enrich.applied', { count }) : t('enrich.previewed', { count });
+    const detail = (result.stories || [])
+      .map((s) => `${s.story_id}\n  ${s.filled.join(', ')} → ${[...s.tags, ...s.people].join(' ')}`)
+      .join('\n');
+    show('maintenance-result', detail ? `${summary}\n\n${detail}` : summary);
+    if (apply && count) loadStories().catch(() => {});
+  }
+  $('enrich-preview').addEventListener('click', () => action($('enrich-preview'), 'maintenance-result', () => enrich(false)));
+  $('enrich-apply').addEventListener('click', () => action($('enrich-apply'), 'maintenance-result', () => enrich(true)));
+
   async function tags(apply) {
     show('maintenance-result', await api('/tag', {
-      method: 'POST',
-      body: JSON.stringify(withArchive({ apply }))
+      method: 'POST', body: JSON.stringify(withArchive({ apply }))
     }));
   }
   $('tag-preview').addEventListener('click', () => action($('tag-preview'), 'maintenance-result', () => tags(false)));
@@ -770,8 +1116,8 @@
     const tiers = [];
     if ($('tier-family').checked) tiers.push('family');
     if ($('tier-executor').checked) tiers.push('executor-only');
-    if (!tiers.length) throw new Error('Select at least one tier.');
-    if (!confirm(`Seal ${tiers.join(' and ')} now? Newly generated shares must be copied before this page is closed.`)) return;
+    if (!tiers.length) throw new Error(t('seal.needTier'));
+    if (!confirm(t('seal.confirm', { tiers: tiers.join(' + ') }))) return;
     show('seal-result', await api('/seal', {
       method: 'POST',
       body: JSON.stringify(withArchive({ tiers, plaintext_escrow: $('plaintext-escrow').checked }))
@@ -792,6 +1138,7 @@
 
   /* ---------- start ---------- */
 
+  applyLanguage();
   showView(currentView());
   loadArchive();
 })();

@@ -25,9 +25,11 @@ COMMANDS
       Create a new, empty archive.
 
   story add [--title T] [--date D] [--body TEXT] [--people a,b]
-            [--places a,b] [--tags a,b] [--visibility V]
+            [--places a,b] [--tags a,b] [--visibility V] [--no-enrich]
       Add a story. Reads the body from stdin when --body is omitted.
       Dates may be YYYY-MM-DD, YYYY-MM, YYYY, YYYYs, or omitted.
+      With an LLM configured, empty title/tags/people are filled from
+      the body; --no-enrich turns that off. Fields you supply are kept.
 
   story list [--year Y] [--person SLUG] [--tag TAG]
       List stories, optionally filtered.
@@ -57,6 +59,10 @@ COMMANDS
 
   tag [--dry-run | --apply]
       Suggest tags for stories with an LLM. Previews by default.
+
+  enrich [--apply]
+      Fill empty tags and people on stored stories with an LLM.
+      Previews by default; only ever fills blanks, never rewrites.
 
   ask \"question\"
       Ask the replica. Answers only from stored stories, with citations.
@@ -123,6 +129,7 @@ pub fn run(argv: &[String]) -> i32 {
         Some("seal") => cmd_seal(&args),
         Some("unseal") => cmd_unseal(&args),
         Some("tag") => cmd_tag(&args),
+        Some("enrich") => cmd_enrich(&args),
         Some("ask") => cmd_ask(&args),
         Some("serve") => cmd_serve(&args),
         Some("tui") => cmd_tui(&args),
@@ -238,17 +245,16 @@ fn cmd_init(args: &Args) -> Result<Outcome, Failure> {
 
 fn cmd_story_add(args: &Args) -> Result<Outcome, Failure> {
     let vault = open_vault(args)?;
-    let Some(title) = args.option("title") else {
-        return Err(misuse("story add needs --title"));
-    };
 
     let body = match args.option("body") {
         Some(body) => body.to_owned(),
         None => read_stdin()?,
     };
 
-    let request = NewStory {
-        title: title.to_owned(),
+    let mut request = NewStory {
+        // A missing title is not misuse any more: a model may supply one
+        // from the body. `new_story` still refuses a story with none.
+        title: args.option("title").unwrap_or_default().to_owned(),
         date: args.option("date").map(str::to_owned),
         body,
         people: args.option_csv("people"),
@@ -258,10 +264,65 @@ fn cmd_story_add(args: &Args) -> Result<Outcome, Failure> {
         ..NewStory::default()
     };
 
+    // Never fatal: a metadata helper failing must not cost someone the
+    // words they just typed.
+    let mut notes = String::new();
+    if !args.has_flag("no-enrich") {
+        use crate::core::llm;
+        let settings = llm::LlmSettings::from_env();
+        if settings.api_key.is_some() {
+            match llm::enrich_new_story(&settings, &mut request) {
+                Ok(filled) if !filled.is_empty() => {
+                    let _ = writeln!(notes, "Model filled in: {}", filled.join(", "));
+                }
+                Ok(_nothing_to_fill) => {}
+                Err(error) => {
+                    let _ = writeln!(notes, "Enrichment skipped: {}", error.0);
+                }
+            }
+        }
+    }
+
+    if request.title.trim().is_empty() {
+        return Err(misuse(
+            "story add needs --title (or an LLM configured to write one)",
+        ));
+    }
+
     let story = story::new_story(request).map_err(|error| failed(error.0))?;
     let path = story::save_story(&vault.root, &story, false).map_err(|error| failed(error.0))?;
     let relative = path.strip_prefix(&vault.root).unwrap_or(&path);
-    Ok(Outcome::ok(format!("Wrote {}\n", relative.display())))
+    Ok(Outcome::ok(format!(
+        "{notes}Wrote {}\n",
+        relative.display()
+    )))
+}
+
+fn cmd_enrich(args: &Args) -> Result<Outcome, Failure> {
+    use crate::core::llm;
+    let vault = open_vault(args)?;
+    let settings = llm::LlmSettings::from_env();
+    let apply = args.has_flag("apply");
+
+    let reports =
+        llm::enrich_archive(&settings, &vault.root, apply).map_err(|error| failed(error.0))?;
+
+    let mut out = String::new();
+    for report in &reports {
+        let _ = writeln!(
+            out,
+            "{}\t{}\t{}",
+            report.story_id,
+            report.filled.join(","),
+            report.tags.join(" ")
+        );
+    }
+    let verb = if apply { "Updated" } else { "Would update" };
+    let _ = writeln!(out, "{verb} {} stories", reports.len());
+    if !apply && !reports.is_empty() {
+        let _ = writeln!(out, "Re-run with --apply to write these.");
+    }
+    Ok(Outcome::ok(out))
 }
 
 fn read_stdin() -> Result<String, Failure> {
@@ -880,6 +941,7 @@ mod tests {
             run(&argv(&[
                 "story",
                 "add",
+                "--no-enrich",
                 "--archive",
                 root_text,
                 "--title",
@@ -945,6 +1007,7 @@ mod tests {
         run(&argv(&[
             "story",
             "add",
+            "--no-enrich",
             "--archive",
             root_text,
             "--title",
@@ -990,6 +1053,7 @@ mod tests {
         run(&argv(&[
             "story",
             "add",
+            "--no-enrich",
             "--archive",
             root_text,
             "--title",
@@ -1004,6 +1068,7 @@ mod tests {
         run(&argv(&[
             "story",
             "add",
+            "--no-enrich",
             "--archive",
             root_text,
             "--title",

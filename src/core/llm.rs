@@ -193,6 +193,220 @@ pub fn apply_tag_suggestion(
     Ok(target)
 }
 
+// ----------------------------------------------------------- enrichment --
+
+/// Metadata a model proposed for a story. Every field is a suggestion; the
+/// caller decides which of them are allowed to land.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Enrichment {
+    pub title: Option<String>,
+    pub tags: Vec<String>,
+    pub people: Vec<String>,
+}
+
+/// The model is told to answer in the story's own language: a Russian
+/// childhood should not come back with an English title stapled to it.
+const ENRICH_PROMPT: &str = "Read this life story and describe it.\n\n\
+Respond with ONLY a JSON object and no other text, with exactly these keys:\n\
+  \"title\": a short, plain, factual title, in the SAME LANGUAGE the story is written in\n\
+  \"tags\": an array of 3 to 6 short lowercase topical tags, in the same language\n\
+  \"people\": an array of lowercase hyphenated slugs for people named in the story \
+(for example [\"aunt-mary\"]); use an empty array if nobody is named\n\n\
+Story:\n{body}";
+
+/// Pull the JSON object out of a model reply.
+///
+/// Models wrap JSON in prose or ```json fences often enough that being
+/// strict here would fail for no good reason. The outermost braces are
+/// the answer.
+fn extract_json(reply: &str) -> Option<&str> {
+    let start = reply.find('{')?;
+    let end = reply.rfind('}')?;
+    if end <= start {
+        return None;
+    }
+    reply.get(start..=end)
+}
+
+fn json_string_list(value: Option<&serde_json::Value>) -> Vec<String> {
+    let Some(items) = value.and_then(|value| value.as_array()) else {
+        return Vec::new();
+    };
+    let mut out: Vec<String> = items
+        .iter()
+        .filter_map(|item| item.as_str())
+        .map(|item| item.trim().to_lowercase())
+        .filter(|item| !item.is_empty())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Parse a model's enrichment reply. Kept separate from the request so it
+/// can be tested without a network.
+pub fn parse_enrichment(reply: &str) -> Result<Enrichment, LlmError> {
+    let Some(json) = extract_json(reply) else {
+        return Err(LlmError(format!(
+            "enrichment reply contained no JSON object: {reply}"
+        )));
+    };
+    let parsed: serde_json::Value = serde_json::from_str(json)
+        .map_err(|error| LlmError(format!("could not parse enrichment JSON: {error}")))?;
+
+    let title = parsed
+        .get("title")
+        .and_then(|title| title.as_str())
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .map(str::to_owned);
+
+    Ok(Enrichment {
+        title,
+        tags: json_string_list(parsed.get("tags")),
+        // Slugified here rather than trusted: these become frontmatter
+        // references to people/, and the format has to hold whatever the
+        // model felt like returning.
+        people: json_string_list(parsed.get("people"))
+            .iter()
+            .map(|person| story::slugify(person))
+            .filter(|person| !person.is_empty())
+            .collect(),
+    })
+}
+
+/// Ask a model to propose a title, tags and people for a story body.
+pub fn suggest_enrichment(settings: &LlmSettings, body: &str) -> Result<Enrichment, LlmError> {
+    if body.trim().is_empty() {
+        return Err(LlmError(
+            "cannot enrich a story with an empty body".to_owned(),
+        ));
+    }
+    let reply = complete(settings, &ENRICH_PROMPT.replace("{body}", body))?;
+    parse_enrichment(&reply)
+}
+
+/// Which fields an enrichment is allowed to fill: only the empty ones.
+///
+/// The operator's own words always win. A model may fill a blank, never
+/// overwrite something a person chose to write.
+fn fill_empty(
+    enrichment: &Enrichment,
+    title: &mut String,
+    tags: &mut Vec<String>,
+    people: &mut Vec<String>,
+) -> Vec<String> {
+    let mut filled = Vec::new();
+    if title.trim().is_empty() {
+        if let Some(suggested) = &enrichment.title {
+            title.clone_from(suggested);
+            filled.push("title".to_owned());
+        }
+    }
+    if tags.is_empty() && !enrichment.tags.is_empty() {
+        tags.clone_from(&enrichment.tags);
+        filled.push("tags".to_owned());
+    }
+    if people.is_empty() && !enrichment.people.is_empty() {
+        people.clone_from(&enrichment.people);
+        filled.push("people".to_owned());
+    }
+    filled
+}
+
+/// Fill a not-yet-saved story's empty title, tags and people from a model.
+///
+/// Returns the names of the fields that were actually filled, so a caller
+/// can tell the operator what the model contributed rather than leaving
+/// them to guess which words are theirs.
+pub fn enrich_new_story(
+    settings: &LlmSettings,
+    request: &mut story::NewStory,
+) -> Result<Vec<String>, LlmError> {
+    let enrichment = suggest_enrichment(settings, &request.body)?;
+    let filled = fill_empty(
+        &enrichment,
+        &mut request.title,
+        &mut request.tags,
+        &mut request.people,
+    );
+    // Tags a model wrote are recorded as the model's, exactly as they are
+    // when `legacy tag` writes them. A reader must always be able to tell
+    // which words in an archive are the subject's own.
+    if filled.iter().any(|field| field == "tags") {
+        request.tags_generated_by = Some(settings.model.clone());
+    }
+    Ok(filled)
+}
+
+/// What enriching one already-stored story would do, or did.
+#[derive(Debug, Clone)]
+pub struct EnrichmentReport {
+    pub story_id: String,
+    pub filled: Vec<String>,
+    pub title: String,
+    pub tags: Vec<String>,
+    pub people: Vec<String>,
+}
+
+/// Fill empty metadata on stories already in the archive.
+///
+/// Stories that need nothing are skipped without a request, so running
+/// this twice costs one pass and no tokens. With `apply` false nothing is
+/// written — the operator sees what would change first.
+pub fn enrich_archive(
+    settings: &LlmSettings,
+    archive_root: &Path,
+    apply: bool,
+) -> Result<Vec<EnrichmentReport>, LlmError> {
+    let stories = story::iter_stories(archive_root).map_err(|error| LlmError(error.0))?;
+    let mut reports = Vec::new();
+
+    for mut target in stories {
+        let wants_something = target.tags.is_empty() || target.people.is_empty();
+        if !wants_something || target.body.trim().is_empty() {
+            continue;
+        }
+
+        let enrichment = suggest_enrichment(settings, &target.body)?;
+        // A stored story always has a title, so only tags and people are
+        // ever open here; pass a scratch title so `fill_empty` stays the
+        // single place that decides what may be overwritten.
+        let mut title = target.title.clone();
+        let filled = fill_empty(
+            &enrichment,
+            &mut title,
+            &mut target.tags,
+            &mut target.people,
+        );
+        if filled.is_empty() {
+            continue;
+        }
+
+        if apply {
+            let body_before = target.body.clone();
+            if filled.iter().any(|field| field == "tags") {
+                target.tags_generated_by = Some(settings.model.clone());
+            }
+            debug_assert_eq!(
+                body_before, target.body,
+                "enrichment must not rewrite prose"
+            );
+            story::save_story(archive_root, &target, true).map_err(|error| LlmError(error.0))?;
+        }
+
+        reports.push(EnrichmentReport {
+            story_id: target.id.clone(),
+            filled,
+            title: target.title.clone(),
+            tags: target.tags.clone(),
+            people: target.people.clone(),
+        });
+    }
+
+    Ok(reports)
+}
+
 /// Suggest tags for every story a model has not already tagged.
 pub fn suggest_tags_for_archive(
     settings: &LlmSettings,
@@ -391,7 +605,8 @@ fn split_sources(reply: &str, retrieved: &[Story]) -> AskResult {
 #[cfg(test)]
 mod tests {
     use super::{
-        check_sunset, parse_tag_list, retrieval_query, split_sources, LlmSettings, REFUSAL,
+        check_sunset, enrich_new_story, fill_empty, parse_enrichment, parse_tag_list,
+        retrieval_query, split_sources, Enrichment, LlmSettings, REFUSAL,
     };
     use crate::core::story::{new_story, NewStory};
 
@@ -489,5 +704,92 @@ mod tests {
         let result = split_sources(&format!("{REFUSAL}\nSources: none"), &retrieved);
         assert_eq!(result.answer, REFUSAL);
         assert!(result.cited_story_ids.is_empty());
+    }
+
+    #[test]
+    fn enrichment_parses_a_fenced_reply() {
+        // Models wrap JSON in fences and prose constantly; refusing that
+        // would fail for a reply that is perfectly usable.
+        let reply = "Sure!\n```json\n{\"title\": \"The sunfish summer\", \
+             \"tags\": [\"Summer\", \"family\", \"summer\"], \
+             \"people\": [\"Uncle Ray\", \"\"]}\n```\nHope that helps.";
+        let parsed = parse_enrichment(reply).expect("parses");
+
+        assert_eq!(parsed.title.as_deref(), Some("The sunfish summer"));
+        // Lowercased, sorted and de-duplicated, like the tag path.
+        assert_eq!(parsed.tags, vec!["family".to_owned(), "summer".to_owned()]);
+        // People are slugified, never trusted as returned.
+        assert_eq!(parsed.people, vec!["uncle-ray".to_owned()]);
+    }
+
+    #[test]
+    fn enrichment_keeps_the_story_language() {
+        let reply = "{\"title\": \"Первый день в школе\", \"tags\": [\"Школа\"], \
+             \"people\": [\"Тётя Маша\"]}";
+        let parsed = parse_enrichment(reply).expect("parses");
+
+        assert_eq!(parsed.title.as_deref(), Some("Первый день в школе"));
+        assert_eq!(parsed.tags, vec!["школа".to_owned()]);
+        assert_eq!(parsed.people, vec!["тётя-маша".to_owned()]);
+    }
+
+    #[test]
+    fn enrichment_rejects_a_reply_with_no_json() {
+        assert!(parse_enrichment("I could not read that story.").is_err());
+    }
+
+    #[test]
+    fn enrichment_only_fills_fields_left_empty() {
+        let suggestion = Enrichment {
+            title: Some("Model title".to_owned()),
+            tags: vec!["model-tag".to_owned()],
+            people: vec!["model-person".to_owned()],
+        };
+
+        // A field the person filled in themselves is never overwritten.
+        let mut title = "Mine".to_owned();
+        let mut tags = vec!["mine".to_owned()];
+        let mut people: Vec<String> = Vec::new();
+        let filled = fill_empty(&suggestion, &mut title, &mut tags, &mut people);
+
+        assert_eq!(title, "Mine");
+        assert_eq!(tags, vec!["mine".to_owned()]);
+        assert_eq!(people, vec!["model-person".to_owned()]);
+        assert_eq!(filled, vec!["people".to_owned()]);
+    }
+
+    #[test]
+    fn enrichment_fills_every_empty_field_and_reports_them() {
+        let suggestion = Enrichment {
+            title: Some("Model title".to_owned()),
+            tags: vec!["a".to_owned()],
+            people: vec!["b".to_owned()],
+        };
+        let mut title = "   ".to_owned();
+        let mut tags: Vec<String> = Vec::new();
+        let mut people: Vec<String> = Vec::new();
+        let filled = fill_empty(&suggestion, &mut title, &mut tags, &mut people);
+
+        assert_eq!(title, "Model title");
+        assert_eq!(
+            filled,
+            vec!["title".to_owned(), "tags".to_owned(), "people".to_owned()]
+        );
+    }
+
+    #[test]
+    fn enriching_a_new_story_without_a_key_does_not_touch_the_network() {
+        let settings = LlmSettings {
+            api_key: None,
+            // Would connect-refuse if it tried; the key check comes first.
+            base_url: "http://127.0.0.1:1".to_owned(),
+            model: "test".to_owned(),
+        };
+        let mut request = NewStory {
+            body: "Something happened.".to_owned(),
+            ..NewStory::default()
+        };
+        assert!(enrich_new_story(&settings, &mut request).is_err());
+        assert!(request.title.is_empty(), "a failure must change nothing");
     }
 }

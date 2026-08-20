@@ -210,7 +210,10 @@ Rules the code enforces:
   month, or decade, or not at all. The program never invents precision.
 - The `id` is derived once from the date prefix (if any) and a slug of the
   title, and used as the filename; it also determines which `timeline/<year>/`
-  bucket (or `timeline/undated/`) the file lives in.
+  bucket (or `timeline/undated/`) the file lives in. The slug is Unicode, not
+  ASCII: a life lived in Russian or Greek keeps its own script in ids and
+  filenames rather than being transliterated into something the subject
+  would not recognise.
 - LLM-generated tags are written to frontmatter but always flagged via
   `tags_generated_by`; the human's own words in the body are never rewritten
   by a model.
@@ -362,6 +365,37 @@ legacy tag --archive ./my-archive --apply         # write them; sets tags_genera
 legacy ask "What did you do after school?" --archive ./my-archive
 ```
 
+### Filling in what you left blank
+
+With a model configured, `story add` fills an empty title, tags or people
+from what you wrote. Anything you type yourself is kept exactly as typed —
+a model may fill a blank, never overwrite a person's own words. Pass
+`--no-enrich` to turn it off for one story:
+
+```bash
+# No title needed: the model reads the body and writes one, in the same
+# language the story is written in.
+legacy story add --body "Dad borrowed a neighbour's sunfish for the week."
+```
+
+`legacy enrich` does the same for stories already in the archive, and only
+looks at ones missing tags or people, so running it twice costs one pass
+and no tokens:
+
+```bash
+legacy enrich            # preview what would be filled in (default)
+legacy enrich --apply    # write it
+```
+
+Tags a model wrote always set `tags_generated_by` in the frontmatter,
+whether they arrived via `tag`, `enrich`, or `story add`. A reader can
+always tell which words in the archive are the subject's own — that is the
+whole point of recording it.
+
+Enrichment is never allowed to cost you a story: if the model is missing,
+misconfigured or unreachable, the story is still saved exactly as typed and
+the failure is reported alongside it.
+
 ### Configuration
 
 Every optional feature reads a `LEGACY_`-prefixed variable first and falls
@@ -437,11 +471,27 @@ Routes: `POST /init`, `GET /archive`, `POST /stories`, `GET /stories`,
 `POST /timeline/build`, `GET /verify`, `POST /media/ingest`,
 `POST /interviews`, `GET /interviews/{id}`, `POST /interviews/{id}/answer`,
 `POST /interviews/{id}/skip`, `POST /seal`, `POST /unseal`, `POST /tag`,
-`POST /ask`. `POST /seal`'s response body contains the shares — same
-"printed once, never stored" rule as the CLI, just delivered over HTTP
-instead of the terminal. `/tag` and `/ask` need `LEGACY_LLM_API_KEY` set,
-same as their CLI counterparts; voice mode has no HTTP route since it needs
-a local microphone.
+`POST /enrich`, `POST /ask`. `POST /seal`'s response body contains the
+shares — same "printed once, never stored" rule as the CLI, just delivered
+over HTTP instead of the terminal. `/tag`, `/enrich` and `/ask` need
+`LEGACY_LLM_API_KEY` set, same as their CLI counterparts; voice mode has no
+HTTP route since it needs a local microphone.
+
+`POST /stories` enriches empty fields by default when a model is
+configured; send `"enrich": false` to skip it. The response carries
+`enriched_fields` (what the model filled in) and, if the model could not be
+reached, `enrich_error` — the story is saved either way.
+
+### Web UI
+
+`legacy serve` serves a small web UI at `/`. It leads with the add-a-story
+form and keeps everything else behind a menu, so the common case on a phone
+is one screen with no setup. It is available in English and Russian,
+switched on the Settings screen and remembered in that browser's
+`localStorage`; the choice affects the interface only, never the archive.
+Stories are stored in whatever language they were written in — titles in
+any script produce usable ids and filenames, so `Первый день в школе`
+becomes `timeline/1987/1987-09-01-первый-день-в-школе.md`.
 
 ## Layout
 
